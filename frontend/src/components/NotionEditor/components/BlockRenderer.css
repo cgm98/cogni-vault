@@ -1,0 +1,319 @@
+.block-container {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  margin: var(--note-block-spacing, 4px) 0;
+  padding-left: 32px;
+}
+/* [[wikilinks]] y [texto](url) — Ctrl+Click abre */
+.block-editor .wiki-link {
+  color: var(--primary, #7b5cea);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.block-editor a.md-link {
+  color: var(--accent, #3b82f6);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.block-editor .tag-link {
+  color: var(--primary, #7b5cea);
+  background: color-mix(in srgb, var(--primary, #7b5cea) 12%, transparent);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 0.92em;
+  cursor: pointer;
+}
+.drag-handle {
+  position: absolute;
+  left: 14px;
+  top: 6px;
+  cursor: grab;
+  color: var(--muted, #666);
+  opacity: 0;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 3px;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+.add-block-btn {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  cursor: pointer;
+  color: var(--muted, #666);
+  opacity: 0;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 3px;
+  transition: opacity 0.15s ease, background 0.1s;
+  z-index: 10;
+}
+.delete-block-btn {
+  position: absolute;
+  right: 14px;
+  top: 6px;
+  cursor: pointer;
+  color: var(--muted, #666);
+  opacity: 0;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 3px;
+  transition: opacity 0.15s ease, background 0.1s;
+  z-index: 10;
+}
+.add-block-btn:hover {
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  color: var(--primary, #7b5cea);
+}
+.delete-block-btn:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+.block-container:hover > .drag-handle,
+.block-container:hover > .add-block-btn,
+.block-container:hover > .delete-block-btn { 
+  opacity: 1; 
+}
+.block-content-wrapper {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.block-content-wrapper:hover {
+  background-color: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+.block-prefix {
+  margin-right: 8px;
+  user-select: none;
+  margin-top: 4px;
+  color: var(--muted, #888);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.toggle-btn { 
+  cursor: pointer; 
+  font-size: var(--text-xs); 
+  margin-top: 6px; 
+  color: var(--primary, #7b5cea);
+}
+.block-editor {
+  flex: 1;
+  width: 100%;
+  outline: none;
+  min-height: 24px;
+  font-family: var(--note-font-family, inherit);
+  line-height: var(--note-line-height, 1.6);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg, #ffffff);
+  caret-color: var(--fg, #ffffff);
+  font-size: var(--note-font-size, 15px);
+  font-weight: var(--note-font-weight, 400);
+  letter-spacing: var(--note-letter-spacing, 0px);
+  text-align: var(--note-text-align, left);
+  padding: 3px 2px;
+}
+
+.block-editor[contenteditable]:empty:not(.divider)::before {
+  content: attr(placeholder);
+  color: var(--muted, #555);
+  pointer-events: none;
+  display: block;
+}
+
+.block-editor.checked {
+  text-decoration: line-through;
+  color: var(--muted, #666);
+  opacity: 0.6;
+}
+
+.block-editor.h1 { font-size: 1.85em; font-weight: 700; margin-top: 16px; margin-bottom: 4px; border-bottom: 1px solid var(--border, #2d2d2d); padding-bottom: 4px; }
+.block-editor.h2 { font-size: 1.45em; font-weight: 700; margin-top: 12px; margin-bottom: 4px; }
+.block-editor.h3 { font-size: 1.25em; font-weight: 600; margin-top: 8px; margin-bottom: 4px; }
+.block-editor.h4 { font-size: 1.10em; font-weight: 600; margin-top: 8px; margin-bottom: 2px; color: var(--fg, #ffffff); }
+.block-editor.h5 { font-size: 0.95em; font-weight: 600; margin-top: 6px; margin-bottom: 2px; color: var(--muted, #a3a3a3); text-transform: uppercase; letter-spacing: 0.04em; }
+.block-editor.h6 { font-size: 0.88em; font-weight: 600; margin-top: 4px; margin-bottom: 2px; color: var(--muted, #a3a3a3); font-style: italic; }
+.block-editor.quote { border-left: 3px solid var(--primary, #7b5cea); padding-left: 14px; font-style: italic; color: var(--muted, #888); background: color-mix(in srgb, var(--fg) 2%, transparent); border-radius: 0 4px 4px 0; }
+.block-editor.code { 
+  font-family: monospace; 
+  background: var(--surface, #1e1e1e); 
+  padding: 12px; 
+  border-radius: var(--note-code-border-radius, 6px); 
+  font-size: var(--note-code-font-size, 14px); 
+}
+.block-editor.divider { height: 0; padding: 0; margin: 8px 0; border: none; border-bottom: 2px solid var(--border, #2d2d2d); color: transparent; cursor: default; }
+
+.block-children {
+  margin-left: var(--note-indent-spacing, 16px);
+  padding-left: 12px;
+  border-left: 1px solid var(--border, #2d2d2d);
+}
+
+.drop-indicator {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: var(--primary, #7b5cea);
+  z-index: 100;
+  pointer-events: none;
+}
+.drop-indicator::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary, #7b5cea);
+}
+.drop-indicator.before { top: -2px; }
+.drop-indicator.after { bottom: -2px; }
+.drop-indicator.inside { bottom: -2px; left: 32px; }
+.dragging { opacity: 0.3; }
+
+.selected > .block-content-wrapper {
+  background-color: color-mix(in srgb, var(--primary, #7b5cea) 12%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary, #7b5cea) 35%, transparent);
+}
+
+.block-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--surface, #1e1e1e);
+  border: 1px solid var(--border, #2d2d2d);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  width: 160px;
+  padding: 4px;
+}
+.menu-item {
+  /* también es <button>: neutralizar estilos de agente de usuario */
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: var(--text-base);
+  color: var(--fg, #ffffff);
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: normal;
+  text-align: left;
+}
+.menu-item:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+.menu-item.delete {
+  color: var(--danger);
+}
+.menu-item.delete:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
+.menu-icon {
+  width: 14px;
+  text-align: center;
+  font-size: 12px;
+}
+.block-image {
+  padding: 4px 0;
+  cursor: default;
+}
+.block-image img {
+  max-width: 100%;
+  border-radius: 6px;
+  display: block;
+}
+.block-image-empty {
+  padding: 12px;
+  border: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent);
+  border-radius: 6px;
+  opacity: 0.6;
+  font-size: 13px;
+}
+
+.block-container.type-column {
+  padding-left: 0;
+}
+.columns-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  width: 100%;
+}
+.column-add-btn {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  background: none;
+  border: 1px dashed var(--border, #2d2d2d);
+  border-radius: 4px;
+  color: var(--muted, #666);
+  cursor: pointer;
+}
+.column-add-btn:hover {
+  color: var(--primary, #7b5cea);
+  border-color: var(--primary, #7b5cea);
+}
+.column-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.column-children {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
+}
+.column-remove-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: var(--surface, #1e1e1e);
+  border: 1px solid var(--border, #2d2d2d);
+  border-radius: 50%;
+  color: var(--muted, #666);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+.column-body:hover .column-remove-btn {
+  opacity: 1;
+}
+.column-remove-btn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}

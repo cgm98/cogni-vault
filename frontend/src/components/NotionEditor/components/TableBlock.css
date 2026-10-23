@@ -1,0 +1,163 @@
+.notion-table-block {
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+}
+
+.table-container-rel {
+  position: relative;
+  width: 100%;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border, #2d2d2d);
+  border-radius: 4px;
+  width: 100%;
+}
+
+.notion-table {
+  border-collapse: collapse;
+  width: 100%;
+  background: var(--surface, #1e1e1e);
+  table-layout: fixed;
+}
+
+.notion-table td {
+  border: 1px solid var(--border, #2d2d2d);
+  padding: 0;
+  min-width: 120px;
+  position: relative;
+}
+
+.table-cell {
+  padding: 8px 12px;
+  outline: none;
+  min-height: 22px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--fg, #ffffff);
+  text-align: left;
+  position: relative;
+  z-index: 1;
+  transition: box-shadow 0.15s ease;
+}
+
+.table-cell:focus {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  box-shadow: inset 0 0 0 2px var(--primary, #7b5cea);
+  z-index: 5;
+}
+
+.header-row-bg {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.header-col-bg {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.header-cell-font {
+  font-weight: 600;
+  color: var(--primary, #7b5cea) !important;
+}
+
+.add-col-trigger, .add-row-trigger, .table-toolbar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.notion-table-block:hover .add-col-trigger,
+.notion-table-block:hover .add-row-trigger,
+.notion-table-block:hover .table-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.add-col-trigger {
+  position: absolute;
+  right: -20px;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 10;
+}
+
+.add-col-trigger:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+.add-row-trigger {
+  position: absolute;
+  bottom: -20px;
+  left: 0;
+  right: 0;
+  height: 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 10;
+}
+
+.add-row-trigger:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+.plus-icon {
+  color: var(--muted, #888);
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.table-toolbar {
+  position: absolute;
+  top: -36px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface, #1e1e1e);
+  border: 1px solid var(--border, #2d2d2d);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  z-index: 100;
+  user-select: none;
+}
+
+.toolbar-icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--danger);
+  transition: background 0.15s ease;
+}
+
+.toolbar-icon-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
+.toolbar-icon-btn:disabled {
+  color: color-mix(in srgb, var(--fg) 25%, transparent);
+  cursor: not-allowed;
+}

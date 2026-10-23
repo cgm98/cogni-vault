@@ -1,0 +1,581 @@
+.notes-container {
+  height: 100%; min-height: 0; width: 100%; background-color: var(--bg); color: var(--fg);
+  font-family: var(--font-sans, sans-serif); display: flex; flex-direction: column; overflow: hidden; position: relative;
+}
+.notes-header {
+  background-color: var(--surface); border-bottom: 1px solid var(--border); height: 2.5rem; padding: 0 1rem;
+  display: flex; align-items: center; justify-content: space-between; user-select: none; flex-shrink: 0; font-size: 0.75rem;
+}
+.header-left { display: flex; align-items: center; gap: 0.5rem; }
+.sidebar-toggle-btn { background: transparent; border: none; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0.25rem; border-radius: 0.25rem; transition: all 0.2s; }
+.sidebar-toggle-btn:hover { background-color: var(--border); color: var(--fg); }
+.nv-title-group { display: flex; align-items: center; gap: 0.375rem; font-weight: bold; letter-spacing: -0.025em; color: var(--fg); }
+.header-logo-icon { width: 0.625rem; height: 0.625rem; background-color: var(--primary); border-radius: 0.125rem; }
+
+.header-right { display: flex; align-items: center; gap: 0.375rem; }
+@media (min-width: 768px) {
+  .header-right { gap: 0.625rem; }
+}
+.keyboard-hint { display: none; align-items: center; gap: 0.375rem; font-size: var(--text-xs); color: var(--muted); font-family: monospace; padding-right: 0.5rem; border-right: 1px solid var(--border); }
+@media (min-width: 1024px) {
+  .keyboard-hint { display: flex; }
+}
+.nv-kbd-key { padding: 0.125rem 0.25rem; border-radius: 0.25rem; background-color: var(--bg); border: 1px solid var(--border); font-size: var(--text-xs); }
+
+.layout-toggle { display: flex; align-items: center; background-color: var(--bg); padding: 0.125rem; border-radius: 0.25rem; border: 1px solid var(--border); flex-shrink: 0; }
+.layout-btn {
+  padding: 0.25rem 0.625rem; border-radius: 0.25rem; font-size: var(--text-xs); text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 0.25rem; cursor: pointer; transition: all 0.2s; background: transparent; border: none; color: var(--muted);
+}
+.layout-btn:hover { color: var(--fg); }
+.layout-btn.active { background-color: var(--border); color: var(--primary); font-weight: bold; }
+
+.palette-btn {
+  padding: 0.25rem 0.5rem; background-color: var(--bg); border: 1px solid var(--border); border-radius: 0.25rem; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 0.25rem; transition: all 0.2s;
+}
+.palette-btn:hover { background-color: var(--border); color: var(--primary); }
+
+.copilot-btn {
+  padding: 0.25rem; border: 1px solid transparent; border-radius: 0.25rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+}
+.copilot-active { background-color: color-mix(in srgb, var(--primary) 15%, transparent); border-color: color-mix(in srgb, var(--primary) 30%, transparent); color: var(--primary); }
+.copilot-inactive { background-color: var(--bg); border-color: var(--border); color: var(--muted); }
+.copilot-inactive:hover { color: var(--primary); }
+
+.notes-main { flex: 1; display: flex; flex-direction: row; overflow: hidden; min-height: 0; position: relative; }
+.inner-content { flex: 1; display: flex; overflow: hidden; min-height: 0; min-width: 0; }
+
+.nv-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  z-index: 10000;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.nv-toast.visible { opacity: 1; transform: translateY(0); }
+.nv-toast.success { border-color: var(--success); background: color-mix(in srgb, var(--success) 5%, transparent); color: var(--success); }
+.nv-toast.error { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 5%, transparent); color: var(--danger); }
+
+/* ── Selector de Cerebros (Nivel 0) ── */
+.cerebro-selector-dropdown-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.cerebro-current-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cerebro-current-btn:hover {
+  background: var(--surface);
+  border-color: var(--primary);
+}
+
+.cerebro-icon-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+.cerebro-current-name {
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cerebro-arrow {
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.cerebro-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.cerebro-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 250px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+  z-index: 1000;
+  backdrop-filter: blur(12px);
+}
+
+.cerebro-dropdown-header {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 4px 8px;
+  font-weight: 700;
+}
+
+.cerebro-dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cerebro-dropdown-item:hover {
+  background: var(--border);
+}
+
+.cerebro-dropdown-item.active {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.cerebro-item-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.cerebro-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cerebro-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cerebro-item-desc {
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cerebro-dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.cerebro-create-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cerebro-create-btn:hover {
+  background: var(--border);
+}
+
+/* ── Barra de Facetas Temporales / Los 3 Rostros ── */
+.facet-pills-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  padding: 2px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.facet-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.facet-pill-btn:hover {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.facet-pill-btn.active {
+  background: var(--surface);
+  color: var(--fg);
+  border-color: var(--border);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.facet-pill-past.active {
+  color: #34d399;
+  border-color: #10b981;
+  background: color-mix(in srgb, #10b981 12%, var(--surface));
+}
+
+.facet-pill-present.active {
+  color: #7dd3fc;
+  border-color: #38bdf8;
+  background: color-mix(in srgb, #38bdf8 12%, var(--surface));
+}
+
+.facet-pill-future.active {
+  color: #fbbf24;
+  border-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface));
+}
+
+.facet-pill-count {
+  font-size: 9.5px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+  color: var(--fg);
+  font-weight: 700;
+}
+
+/* ── Sub-barra Contextual del Pilar Activo y Control de Poda ── */
+.facet-context-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 14px;
+  background: color-mix(in srgb, var(--surface) 80%, var(--bg));
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  transition: all 0.25s ease;
+  min-height: 30px;
+}
+
+.facet-context-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.facet-context-badge {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.facet-context-desc {
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.facet-context-past_memory .facet-context-badge {
+  color: #34d399;
+}
+.facet-context-past_memory {
+  border-bottom-color: rgba(16, 185, 129, 0.25);
+  background: color-mix(in srgb, #10b981 4%, var(--surface));
+}
+
+.facet-context-present_discernment .facet-context-badge {
+  color: #7dd3fc;
+}
+.facet-context-present_discernment {
+  border-bottom-color: rgba(56, 189, 248, 0.25);
+  background: color-mix(in srgb, #38bdf8 4%, var(--surface));
+}
+
+.facet-context-future_providence .facet-context-badge {
+  color: #fbbf24;
+}
+.facet-context-future_providence {
+  border-bottom-color: rgba(245, 158, 11, 0.25);
+  background: color-mix(in srgb, #f59e0b 4%, var(--surface));
+}
+
+.facet-context-all .facet-context-badge {
+  color: var(--fg);
+}
+
+.facet-context-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sparse-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--border) 35%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 10.5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.sparse-toggle-btn:hover {
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--border) 80%, var(--primary));
+}
+
+.sparse-toggle-btn.active {
+  color: var(--fg);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface) 90%, var(--primary) 10%);
+}
+
+.sparse-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.2s;
+}
+
+.sparse-toggle-btn.active .sparse-toggle-dot {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+/* ── Modal de Creación de Cerebro ── */
+.cerebro-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.cerebro-modal-card {
+  width: 420px;
+  max-width: 90vw;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: modal-appear 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modal-appear {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.cerebro-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cerebro-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cerebro-modal-title-row h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--fg);
+}
+
+.cerebro-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cerebro-modal-close:hover {
+  color: var(--fg);
+}
+
+.cerebro-modal-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cerebro-modal-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cerebro-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cerebro-form-group.flex-1 {
+  flex: 1;
+}
+
+.cerebro-form-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.cerebro-input,
+.cerebro-textarea,
+.cerebro-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--fg);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.cerebro-input:focus,
+.cerebro-textarea:focus,
+.cerebro-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.cerebro-form-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.cerebro-color-input {
+  width: 44px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cerebro-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 50%, var(--bg));
+}
+
+.cerebro-btn-cancel {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cerebro-btn-submit {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: var(--primary);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.cerebro-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Keep toolbars and side panels inside the available application viewport. */
+.notes-header { height: auto; min-height: 40px; gap: 8px; flex-wrap: wrap; padding: 6px 12px; }
+.notes-header > .header-left, .notes-header > .header-right { flex-shrink: 0; }
+.facet-pills-bar { min-width: 0; max-width: 100%; overflow-x: auto; }
+.facet-pill-btn { flex-shrink: 0; white-space: nowrap; }
+.facet-context-banner { flex-shrink: 0; }
+@media (max-width: 1200px) {
+  .notes-header .facet-pills-bar { order: 3; flex-basis: 100%; }
+  .notes-header .keyboard-hint { display: none; }
+}
+@media (max-width: 767px) {
+  .notes-main > .notes-sidebar { position: absolute; inset: 0 auto 0 0; z-index: 30; max-width: calc(100% - 48px); background: var(--surface); box-shadow: 12px 0 32px #0006; }
+  .notes-main > .notes-copilot { position: absolute; inset: 0 0 0 auto; z-index: 35; max-width: 100%; background: var(--surface); }
+  .facet-context-desc, .facet-context-controls { display: none; }
+  .notes-header .palette-btn span { display: none; }
+}
+
+
+.notes-notice, .notes-list-summary { padding: 8px 16px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.notes-notice-error { color: var(--danger); }
+.notes-notice button { margin-left: 12px; text-decoration: underline; }
+.notes-toast-stack { position: fixed; bottom: 24px; right: 24px; z-index: 100; display: flex; flex-direction: column; gap: 8px; max-width: min(420px, calc(100vw - 32px)); }
+.notes-toast { background: var(--surface); padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px #0005; font-size: 13px; }
+.notes-toast.error { border-color: var(--danger); }
+.notes-toast.success { border-color: var(--success); }

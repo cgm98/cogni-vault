@@ -1,0 +1,36 @@
+.ne-slash-menu {
+  position: fixed;
+  background: var(--surface, #1e1e1e);
+  border: 1px solid var(--border, #2d2d2d);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  width: 260px;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 10000;
+  font-family: var(--font-sans, sans-serif);
+}
+.slash-item {
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--fg, #ffffff);
+  transition: background 0.15s;
+}
+.slash-item.active, .slash-item:hover { 
+  background: color-mix(in srgb, var(--primary, #7b5cea) 15%, transparent);
+}
+.slash-item .icon { 
+  width: 20px; 
+  color: var(--primary, #7b5cea); 
+  font-weight: bold; 
+}
+.slash-empty { 
+  padding: 12px; 
+  color: var(--muted, #888888); 
+  font-size: 13px; 
+  text-align: center; 
+}

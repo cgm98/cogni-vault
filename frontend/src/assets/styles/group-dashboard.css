@@ -1,0 +1,71 @@
+.group-dashboard {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.kpi-card {
+  background: var(--c-surface, rgba(30, 41, 59, 0.5));
+  border: 1px solid var(--c-border, rgba(51, 65, 85, 0.6));
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  backdrop-filter: blur(8px);
+}
+
+.kpi-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--c-text-muted, #94a3b8);
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--c-text, #f8fafc);
+  margin-top: 0.5rem;
+}
+
+/* Dashboard views share these names; keep selectors local to their shell. */
+.gdash-wrapper { height: 100%; overflow-y: auto; background: var(--bg); }
+.gdash-container { width: 100%; max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
+.gdash-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+.gdash-header-icon, .gdash-action-icon { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; background: var(--primary-glow); color: var(--primary); }
+.gdash-header h1 { font-size: 26px; font-weight: 700; letter-spacing: -.03em; }
+.gdash-header .subtitle, .gdash-section .card-subtitle { margin-top: 5px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.gdash-kpis, .gdash-skeleton { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.gdash-kpi-card, .gdash-section, .gdash-sk-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.gdash-kpi-card { display: flex; flex-direction: column; gap: 8px; padding: 20px; }
+.gdash-kpi-card .label { font-size: 13px; color: var(--muted); }
+.gdash-kpi-card .value { font-size: 30px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gdash-kpi-card .desc { font-size: 12px; color: var(--muted); }
+.gdash-wrapper .warning { color: var(--warning); }
+.gdash-wrapper .success { color: var(--success); }
+.gdash-wrapper .error { color: var(--danger); }
+.gdash-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; }
+.gdash-main-col, .gdash-side-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.gdash-section { overflow: hidden; }
+.gdash-section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.gdash-section-header h3 { font-size: 15px; font-weight: 600; }
+.gdash-section-body { padding: 12px 20px; }
+.gdash-list, .gdash-actions-stack { display: flex; flex-direction: column; }
+.gdash-list-item, .gdash-action-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; color: var(--fg); border-bottom: 1px solid var(--border); }
+.gdash-list-item:last-child, .gdash-action-row:last-child { border-bottom: 0; }
+.gdash-list-item-main, .gdash-action-details { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 5px; overflow-wrap: anywhere; }
+.gdash-list-item-title, .gdash-action-details .title { font-size: 13px; font-weight: 600; }
+.gdash-list-item-meta, .gdash-action-details .desc { font-size: 12px; color: var(--muted); }
+.gdash-action-row:hover { color: var(--primary); }
+.gdash-action-icon { width: 34px; height: 34px; border-radius: 8px; }
+.gdash-badge { flex-shrink: 0; padding: 4px 8px; border-radius: 6px; background: var(--bg); font-size: 11px; color: var(--muted); }
+.gdash-empty { padding: 24px 4px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.gdash-progress-bar { height: 5px; overflow: hidden; background: var(--border); border-radius: 4px; margin-top: 5px; }
+.gdash-progress-fill { height: 100%; border-radius: inherit; }
+.gdash-sk-card { height: 136px; }
+@media (max-width: 900px) { .gdash-kpis, .gdash-skeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gdash-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .gdash-container { padding: 24px 16px; } .gdash-header { align-items: flex-start; } .gdash-header h1 { font-size: 22px; } .gdash-kpis, .gdash-skeleton { grid-template-columns: minmax(0, 1fr); } }

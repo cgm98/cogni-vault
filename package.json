@@ -1,0 +1,21 @@
+{
+  "name": "@learn/cogni-vault",
+  "version": "1.0.0",
+  "private": true,
+  "description": "COGNI-VAULT Personal Knowledge Management & Notes",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm run dev --workspace=@cogni-vault/backend\" \"npm run dev --workspace=@cogni-vault/frontend\"",
+    "dev:backend": "npm run dev --workspace=@cogni-vault/backend",
+    "dev:frontend": "npm run dev --workspace=@cogni-vault/frontend",
+    "typecheck": "npm run typecheck --workspace=@cogni-vault/backend && npm run typecheck --workspace=@cogni-vault/frontend",
+    "build": "npm run build --workspace=@cogni-vault/frontend",
+    "test": "node --import tsx --test tests/notes.test.ts tests/noteTree.test.ts tests/markdown.test.ts tests/liveEditor.test.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
