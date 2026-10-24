@@ -1,6 +1,8 @@
 export type TemporalFacet = 'PAST_MEMORY' | 'PRESENT_DISCERNMENT' | 'FUTURE_PROVIDENCE';
 
 export interface Concept {
+  workspace_id?: string | null;
+  folder_id?: string | null;
   id: string;
   cerebro_id?: string | null;
   domain?: string | null;
@@ -34,6 +36,8 @@ export interface ConceptWithMemory extends Concept {
 }
 
 export interface ConceptSummary {
+  workspace_id?: string | null;
+  folder_id?: string | null;
   id: string;
   title: string;
   domain: string | null;

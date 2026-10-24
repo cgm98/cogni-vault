@@ -26,13 +26,6 @@
             Dashboard
           </router-link>
           <router-link
-            to="/taxonomy"
-            class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
-            :class="$route.path.startsWith('/taxonomy') ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'"
-          >
-            Taxonomía
-          </router-link>
-          <router-link
             to="/challenge"
             class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
             :class="$route.path.startsWith('/challenge') ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'"
@@ -43,7 +36,7 @@
       </div>
 
       <div class="hidden xl:flex shrink-0 items-center gap-3">
-        <span class="text-[11px] text-slate-500 font-mono">SQLite + FTS5</span>
+        <span class="text-[11px] text-slate-500 font-mono">SQLite WAL · FTS5 · sqlite-vec</span>
       </div>
     </header>
 

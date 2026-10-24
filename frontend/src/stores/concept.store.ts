@@ -14,6 +14,7 @@ export const useConceptStore = defineStore('concept', () => {
   function upsertSummary(item: ConceptSummary | Concept) {
     const summary: ConceptSummary = {
       id: item.id, title: item.title, domain: item.domain ?? null,
+      workspace_id: item.workspace_id, folder_id: item.folder_id,
       topic_id: item.topic_id, temporal_facet: item.temporal_facet,
       created_at: item.created_at, updated_at: item.updated_at || ''
     };

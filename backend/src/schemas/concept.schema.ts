@@ -16,6 +16,12 @@ export const concepts = sqliteTable('concepts', {
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
   deleted_at: text('deleted_at'),
+  workspace_id: text('workspace_id'),
+  folder_id: text('folder_id'),
+  version: integer('version').default(1).notNull(),
+  trash_batch_id: text('trash_batch_id'),
+  doc_ast: text('doc_ast'),
+  schema_version: integer('schema_version').default(1).notNull(),
   // Provenance (Tier 2, watermarking): 'human' | 'agent', seteado solo al crear, inmutable
   // después — ver ConceptService.create(). No confundir con "quién lo editó último".
   author_type: text('author_type').notNull().default('human')

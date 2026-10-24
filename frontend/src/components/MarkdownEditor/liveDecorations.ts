@@ -4,28 +4,43 @@ import { syntaxTree } from '@codemirror/language';
 import { createApp, type App } from 'vue';
 import DOMPurify from 'dompurify';
 import MermaidRenderer from '../MermaidRenderer/Index.vue';
-import { renderMarkdown } from '../../lib/markdown';
+import { renderMarkdown, inlineMathRanges } from '../../lib/markdown';
 import { previewBlocks, selectionTouches } from './liveDocument';
+import { TableWidget } from './tableWidget';
 
 const blockCache = new WeakMap<import('@codemirror/state').Text, ReturnType<typeof previewBlocks>>();
 export const liveModeEffect = StateEffect.define<boolean>();
 export const focusEffect = StateEffect.define<boolean>();
 const widgetApps = new WeakMap<HTMLElement, App>();
+const previewMeta = new WeakMap<HTMLElement,{source:string;from:number;kind:string;inline:boolean}>();
 class PreviewWidget extends WidgetType {
   constructor(readonly source: string, readonly from: number, readonly kind: string, readonly code = '', readonly inline = false) { super(); }
   eq(other: PreviewWidget) { return this.source === other.source && this.from === other.from && this.kind === other.kind && this.inline === other.inline; }
   toDOM(view: EditorView) {
     const dom = document.createElement(this.inline ? 'span' : 'div');
+    previewMeta.set(dom,{source:this.source,from:this.from,kind:this.kind,inline:this.inline});
     dom.className = this.inline ? 'cm-live-inline' : 'cm-live-preview markdown-reading';
     if (this.kind === 'mermaid') { const app = createApp(MermaidRenderer, { code: this.code }); app.mount(dom); widgetApps.set(dom, app); }
-    else dom.innerHTML = DOMPurify.sanitize(renderMarkdown(this.source));
-    const reveal = () => { view.dispatch({ selection: { anchor: this.from }, scrollIntoView: true }); view.focus(); };
+    else {
+      dom.innerHTML = DOMPurify.sanitize(renderMarkdown(this.source));
+      // An inline widget must not contain a block paragraph (breaks line layout).
+      if (this.inline && dom.firstElementChild?.tagName === 'P') {
+        dom.replaceChildren(...dom.firstElementChild.childNodes);
+      }
+    }
+    const reveal = () => { view.dispatch({ selection: { anchor: previewMeta.get(dom)!.from }, scrollIntoView: true }); view.focus(); };
     if (!this.inline) {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'cm-edit-block'; button.textContent = 'Editar ' + (this.kind === 'mermaid' ? 'diagrama' : this.kind === 'table' ? 'tabla' : 'fórmula'); button.onclick = reveal; dom.append(button);
-    } else { dom.onclick = reveal; dom.title = 'Editar fórmula'; }
+      const labels: Record<string, string> = { mermaid: 'diagrama', table: 'tabla', math: 'fórmula', code: 'código', rule: 'separador' };
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'cm-edit-block'; button.textContent = 'Editar ' + labels[this.kind]; button.onclick = reveal; dom.append(button);
+    } else { dom.onclick = reveal; dom.title = this.kind === 'image' ? 'Editar imagen' : 'Editar fórmula'; }
     return dom;
   }
-  destroy(dom: HTMLElement) { widgetApps.get(dom)?.unmount(); widgetApps.delete(dom); }
+  updateDOM(dom:HTMLElement) {
+    const previous=previewMeta.get(dom);
+    if(!previous || previous.source!==this.source || previous.kind!==this.kind || previous.inline!==this.inline)return false;
+    previous.from=this.from;return true;
+  }
+  destroy(dom: HTMLElement) { previewMeta.delete(dom); widgetApps.get(dom)?.unmount(); widgetApps.delete(dom); }
   ignoreEvent() { return true; }
 }
 class TaskWidget extends WidgetType {
@@ -37,6 +52,10 @@ class TaskWidget extends WidgetType {
     return input;
   }
   ignoreEvent() { return true; }
+}
+class BulletWidget extends WidgetType {
+  toDOM() { const bullet = document.createElement('span'); bullet.className = 'cm-list-bullet'; bullet.textContent = '•'; return bullet; }
+  ignoreEvent() { return false; }
 }
 export const liveDecorations = StateField.define<{ decorations: DecorationSet; enabled: boolean; focused: boolean }>({
   create(state) { return { decorations: build(state, false), enabled: true, focused: false }; },
@@ -59,6 +78,11 @@ function build(state: import('@codemirror/state').EditorState, focused: boolean)
   const hidden: Array<[number, number]> = [];
   const add = (from: number, to: number, decoration: Decoration) => { if (to > from) ranges.push(decoration.range(from, to)); };
   for (const block of blocks) {
+    if (block.kind === 'table') {
+      add(block.from, block.to, Decoration.replace({widget:new TableWidget(block.source,block.from,block.to),block:true}));
+      hidden.push([block.from,block.to]);
+      continue;
+    }
     const widget = new PreviewWidget(block.source, block.from, block.kind, block.code);
     if (focused && selectionTouches(state, block.from, block.to)) {
       // Keep the source editable and the preview below it while editing the block.
@@ -76,6 +100,9 @@ function build(state: import('@codemirror/state').EditorState, focused: boolean)
     if (isHidden(from,to)) return false;
     if (['FencedCode','CodeBlock','InlineCode'].includes(name)) code.push([from,to]);
     if (/^ATXHeading[1-6]$/.test(name)) ranges.push(Decoration.line({ class: 'cm-live-h' + name.slice(-1) }).range(state.doc.lineAt(from).from));
+    if (/^SetextHeading[12]$/.test(name)) {
+      ranges.push(Decoration.line({ class: 'cm-live-h' + name.slice(-1) }).range(state.doc.lineAt(from).from));
+    }
     if (name === 'StrongEmphasis') add(from,to,Decoration.mark({class:'cm-live-strong'}));
     if (name === 'Emphasis') add(from,to,Decoration.mark({class:'cm-live-em'}));
     if (name === 'Strikethrough') add(from,to,Decoration.mark({class:'cm-live-strike'}));
@@ -102,6 +129,11 @@ function build(state: import('@codemirror/state').EditorState, focused: boolean)
       if (parent && !active(parent.from,parent.to) && !['FencedCode','CodeBlock'].includes(parent.name)) add(from,to,Decoration.replace({}));
     }
     if (name === 'TaskMarker' && !active(state.doc.lineAt(from).from,state.doc.lineAt(to).to)) add(from,to,Decoration.replace({widget:new TaskWidget(from,source.slice(from,to).toLowerCase()==='[x]')}));
+    if (name === 'ListMark' && !active(state.doc.lineAt(from).from,state.doc.lineAt(to).to)) {
+      const task = /^\s*\[[ xX]\]/.test(source.slice(to, state.doc.lineAt(to).to));
+      if (task) add(from,to,Decoration.replace({}));
+      else if (/^[-+*]$/.test(source.slice(from,to))) add(from,to,Decoration.replace({widget:new BulletWidget()}));
+    }
   }});
   // Additional note syntax absent from CommonMark; never interpret it inside code.
   const outsideCode = (from: number,to: number) => !isHidden(from,to) && !code.some(([a,b]) => from < b && to > a) && !blocks.some(b=>from>=b.from&&to<=b.to);
@@ -111,9 +143,8 @@ function build(state: import('@codemirror/state').EditorState, focused: boolean)
     add(from,to,Decoration.mark({class:'cm-live-link',attributes:{'data-note-link':match[1].split('|')[0]}}));
     if (!active(from,to)) { const alias = match[1].indexOf('|'); add(from,from+2+(alias >= 0 ? alias+1 : 0),Decoration.replace({})); add(to-2,to,Decoration.replace({})); }
   }
-  for (const match of source.matchAll(/(?<![\\$])\$(?![\s$])([^\n$]*?\S)\$(?!\d)/g)) {
-    const from=match.index!,to=from+match[0].length;
-    if (outsideCode(from,to) && !active(from,to)) add(from,to,Decoration.replace({widget:new PreviewWidget(match[0],from,'math','',true)}));
+  for (const match of inlineMathRanges(source)) {
+    if(outsideCode(match.from,match.to) && !active(match.from,match.to)) add(match.from,match.to,Decoration.replace({widget:new PreviewWidget(source.slice(match.from,match.to),match.from,'math','',true)}));
   }
   return Decoration.set(ranges,true);
 }

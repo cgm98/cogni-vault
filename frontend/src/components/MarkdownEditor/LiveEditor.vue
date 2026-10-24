@@ -11,7 +11,10 @@ import { liveDecorations, liveModeEffect, focusEffect } from './liveDecorations'
 import { wrapSelection } from './liveDocument';
 import type { FileItem } from '../../types';
 import 'katex/dist/katex.min.css';
-const props=defineProps<{fileId:string;content:string;sourceMode?:boolean;files:FileItem[];openFileIds:string[]}>();
+import 'highlight.js/styles/github-dark.css';
+import './document.css';
+import './live-editor.css';
+const props=defineProps<{fileId:string;content:string;sourceMode?:boolean;active?:boolean;toolbarTarget?:HTMLElement|null;files:FileItem[];openFileIds:string[]}>();
 const emit=defineEmits<{(e:'change',id:string,content:string):void;(e:'wikiLinkClick',target:string):void}>();
 const host=ref<HTMLElement>();
 const hasSelection=ref(false);
@@ -37,8 +40,24 @@ function completions(context:CompletionContext){
   if(!slash || context.state.sliceDoc(context.state.doc.lineAt(slash.from).from,slash.from).trim())return null;
   return {from:slash.from,filter:false,options:commands.filter(c=>c.label.startsWith(slash.text.slice(1).toLowerCase())).map(c=>({label:'/'+c.label,detail:c.detail,type:'keyword',apply:c.text}))};
 }
-function format(delimiter:string){if(!view)return;view.dispatch(wrapSelection(view.state,delimiter));view.focus();}
+function cellSelection() {
+ const element=document.activeElement;
+ return element instanceof HTMLTextAreaElement && host.value?.contains(element) ? element : null;
+}
+function format(delimiter:string){
+ const cell=cellSelection();
+ if(cell){const start=cell.selectionStart,end=cell.selectionEnd;cell.setRangeText(delimiter+cell.value.slice(start,end)+delimiter,start,end,'select');cell.dispatchEvent(new Event('input',{bubbles:true}));cell.focus();return;}
+ if(!view)return;view.dispatch(wrapSelection(view.state,delimiter));view.focus();
+}
+function prefixLine(prefix: string) {
+ if (!view || cellSelection()) return;
+ const line = view.state.doc.lineAt(view.state.selection.main.head);
+ view.dispatch({changes:{from:line.from,insert:prefix},selection:{anchor:view.state.selection.main.head+prefix.length}});
+ view.focus();
+}
 function insertLink(){
+ const cell=cellSelection();
+ if(cell){const start=cell.selectionStart,end=cell.selectionEnd;cell.setRangeText('['+(cell.value.slice(start,end)||'enlace')+'](https://)',start,end,'select');cell.dispatchEvent(new Event('input',{bubbles:true}));return;}
  if(!view)return;const {from,to}=view.state.selection.main;
  const label=view.state.sliceDoc(from,to)||'enlace';
  const text='['+label+'](https://)';
@@ -94,25 +113,26 @@ function sync(){
  }finally{restoring=false;}
 }
 onMounted(()=>{currentId=props.fileId;view=new EditorView({state:createState(currentId,props.content),parent:host.value});sync();});
-watch(()=>[props.fileId,props.content,props.sourceMode],sync,{flush:'post'});
+watch(()=>[props.fileId,props.content,props.sourceMode,props.active],()=>{sync();if(props.active !== false)view?.requestMeasure();},{flush:'post'});
 watch(()=>props.openFileIds,ids=>{for(const id of sessions.keys())if(!ids.includes(id))sessions.delete(id);});
 onBeforeUnmount(()=>{cancelAnimationFrame(frame);view?.destroy();sessions.clear();});
+defineExpose({ focus: () => view?.focus() });
 </script>
 <template>
- <div class="live-editor">
-  <div v-if="hasSelection" class="live-format-toolbar" aria-label="Formato de selección" @mousedown.prevent>
+ <div class="live-editor" :class="{'live-editor-source': sourceMode}">
+  <Teleport v-if="toolbarTarget" :to="toolbarTarget">
+  <div class="live-format-toolbar" role="toolbar" aria-label="Formato de la nota" @mousedown.prevent>
+   <button type="button" @click="prefixLine('## ')" title="Insertar encabezado">H2</button>
    <button type="button" @click="format('**')" title="Negrita (Ctrl+B)"><strong>B</strong></button>
    <button type="button" @click="format('*')" title="Cursiva (Ctrl+I)"><em>I</em></button>
    <button type="button" @click="format('`')" title="Código">Código</button>
    <button type="button" @click="insertLink" title="Enlace (Ctrl+K)">Enlace</button>
-   <button type="button" @click="view && undo(view)" title="Deshacer">↶</button>
-   <button type="button" @click="view && redo(view)" title="Rehacer">↷</button>
+   <button type="button" @click="prefixLine('- [ ] ')" title="Insertar tarea">☑</button>
+   <button type="button" @click="view && undo(view)" title="Deshacer" aria-label="Deshacer">↶</button>
+   <button type="button" @click="view && redo(view)" title="Rehacer" aria-label="Rehacer">↷</button>
+   <span class="live-toolbar-hint">{{ hasSelection ? 'Dar formato a la selección' : '/ Insertar' }}</span>
   </div>
+  </Teleport>
   <div ref="host"></div>
  </div>
 </template>
-<style>
-.live-editor{position:relative;min-width:0;min-height:40vh}.live-editor .cm-editor{background:transparent;color:var(--fg);font-size:15px;line-height:1.75}.live-editor .cm-editor.cm-focused{outline:none}.live-editor .cm-scroller{font-family:inherit;overflow:visible}.live-editor .cm-content{padding:12px 0 140px;caret-color:var(--fg);min-height:45vh}.live-editor .cm-line{padding:2px 0}.live-editor .cm-selectionBackground{background:#60a5fa40!important}.live-editor .cm-cursor{border-left-color:var(--fg)}.live-editor .cm-live-h1{font-size:2em;font-weight:700;line-height:1.3;padding:16px 0 10px}.live-editor .cm-live-h2{font-size:1.6em;font-weight:650;padding:14px 0 8px}.live-editor .cm-live-h3{font-size:1.3em;font-weight:650;padding:10px 0 6px}.live-editor .cm-live-h4,.live-editor .cm-live-h5,.live-editor .cm-live-h6{font-weight:650}.cm-live-strong{font-weight:700}.cm-live-em{font-style:italic}.cm-live-strike{text-decoration:line-through}.cm-live-code{font-family:monospace;background:var(--surface);border-radius:4px;padding:1px 3px}.cm-live-link{color:var(--accent,#60a5fa);text-decoration:underline;cursor:pointer}.live-editor .cm-live-quote{border-left:3px solid var(--accent,#60a5fa);padding-left:16px;color:var(--muted)}.cm-live-preview{margin:12px 0;min-width:0;white-space:normal}.cm-edit-block{font-size:11px;color:var(--muted);padding:4px 8px;border:1px solid var(--border);border-radius:5px;margin:6px 0;cursor:pointer}.cm-live-inline p{display:inline;margin:0}.cm-live-inline{cursor:text}.live-format-toolbar{position:sticky;top:0;z-index:5;width:max-content;display:flex;gap:6px;padding:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px}.live-format-toolbar button{padding:4px 8px;color:var(--fg)}.live-editor .cm-tooltip{background:var(--surface);color:var(--fg);border:1px solid var(--border)}.live-editor .cm-tooltip-autocomplete ul li[aria-selected]{background:#2563eb;color:white}.live-editor input[type=checkbox]{margin:0 6px 0 0;cursor:pointer;accent-color:#60a5fa}
-.cm-live-code-line{font-family:monospace;background:var(--surface);font-size:13px}.cm-live-inline img{max-width:100%;height:auto}.cm-live-inline p{display:inline}
-.live-editor [class*=cm-live-h] span{text-decoration:none!important;color:inherit}
-</style>

@@ -13,7 +13,7 @@
     "dev:frontend": "npm run dev --workspace=@cogni-vault/frontend",
     "typecheck": "npm run typecheck --workspace=@cogni-vault/backend && npm run typecheck --workspace=@cogni-vault/frontend",
     "build": "npm run build --workspace=@cogni-vault/frontend",
-    "test": "node --import tsx --test tests/notes.test.ts tests/noteTree.test.ts tests/markdown.test.ts tests/liveEditor.test.ts"
+    "test": "node tests/run-tests.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

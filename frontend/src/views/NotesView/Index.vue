@@ -1,23 +1,22 @@
 <script setup lang="ts">
 import { useConceptStore } from '../../stores/concept.store';
-import { useDomainStore } from '../../stores/domain.store';
-import { useAreaStore } from '../../stores/area.store';
-import { useTopicStore } from '../../stores/topic.store';
 import { useCerebroStore } from '../../stores/cerebro.store';
+import { useFolderStore } from '../../stores/folder.store';
+import { useEpistemicStore } from '../../stores/epistemic.store';
 import type { TemporalFacet } from '../../types/cerebro.types';
 import './style.css';
-import { noteHierarchy } from '../../lib/noteTree';
 import { noteFacets } from '../../lib/noteFacets';
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
-import { FileText, Search, BrainCircuit, PanelLeft, Archive, Plus, ChevronDown, Sparkles } from 'lucide-vue-next';
+import { FileText, Search, BrainCircuit, PanelLeft, Archive, Plus, ChevronDown, Sparkles, ShieldCheck } from 'lucide-vue-next';
 
 import Sidebar from '../../components/Sidebar/Index.vue';
 import MarkdownEditor from '../../components/MarkdownEditor/Index.vue';
 import Copilot from '../../components/Copilot/Index.vue';
 import CommandPalette from '../../components/CommandPalette/Index.vue';
 import Modal from '../../components/Modal/Index.vue';
-import BackupModal from '../../components/BackupModal/Index.vue';
+import HybridSearchModal from '../../components/HybridSearch/HybridSearchModal.vue';
+import EpistemicInspector from '../../components/EpistemicInspector/EpistemicInspector.vue';
 import { ExportService } from '../../services/export.service';
 import { isFileLink, isSymbolLink, linkKey } from '../../lib/wikilinks';
 import { parseFrontmatter } from '../../lib/frontmatter';
@@ -27,12 +26,14 @@ import type { FileItem, FolderItem, TabItem } from '../../types';
 import type { Concept, ConceptSummary } from '../../types/concept.types';
 
 const conceptStore = useConceptStore();
-const domainStore = useDomainStore();
-const areaStore = useAreaStore();
-const topicStore = useTopicStore();
 const cerebroStore = useCerebroStore();
+const folderStore = useFolderStore();
+const epistemicStore = useEpistemicStore();
 const route = useRoute();
 const router = useRouter();
+
+const isHybridSearchModalOpen = ref(false);
+const showEpistemicInspector = ref(false);
 
 // Modal para crear nuevo cerebro
 const isCreateCerebroModalOpen = ref(false);
@@ -88,15 +89,23 @@ const loadNotes = async () => {
   loadingNotes.value = true;
   loadError.value = '';
   try {
-    await Promise.all([
-      cerebroStore.fetchCerebros(), conceptStore.fetchConceptSummaries(),
-      domainStore.fetchDomains(), areaStore.fetchAreas(), topicStore.fetchTopics()
-    ]);
+    await folderStore.migrateLegacy();
+    await Promise.all([cerebroStore.fetchCerebros(), conceptStore.fetchConceptSummaries()]);
+    await folderStore.fetchAll(cerebroStore.cerebros.map(c => c.id));
+    if (cerebroStore.activeCerebro?.id) {
+      void epistemicStore.fetchSources(cerebroStore.activeCerebro.id);
+    }
     await applyRouteQuery();
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : 'No se pudieron cargar las notas';
   } finally { loadingNotes.value = false; }
 };
+
+watch(() => cerebroStore.activeCerebro?.id, (wsId) => {
+  if (wsId && wsId !== 'ALL') {
+    void epistemicStore.fetchSources(wsId);
+  }
+});
 onMounted(() => {
   conceptStore.concepts = [];
   conceptStore.activeConcept = null;
@@ -110,13 +119,19 @@ onUnmounted(() => {
 
 watch(() => route.query, () => { applyRouteQuery(); });
 
-const hierarchy = computed(() => noteHierarchy(cerebroStore.cerebros, areaStore.areas, domainStore.domains, topicStore.topics));
-const folders = computed(() => hierarchy.value.foldersFor(cerebroStore.activeCerebro?.id));
+const folders = computed<FolderItem[]>(() => {
+  const ws=cerebroStore.activeCerebro?.id;
+  return [
+    ...(!ws ? cerebroStore.cerebros.map(c=>({id:c.id,name:c.name,kind:'workspace' as const,parentId:'root'})) : []),
+    ...folderStore.folders.filter(f=>!ws || f.workspace_id===ws).map(f=>({id:f.id,name:f.name,kind:'folder' as const,parentId:f.parent_id || (ws ? 'root' : f.workspace_id)}))
+  ];
+});
 const allFiles = computed<FileItem[]>(() => conceptStore.summaries.map(summary => {
   const full = conceptStore.concepts.find(c => c.id === summary.id);
   const note = full || summary;
   return {
-    id: note.id, name: note.title, ...hierarchy.value.location(note),
+    id: note.id, name: note.title, workspaceId: note.workspace_id,
+    folderId: note.folder_id || (cerebroStore.activeCerebro ? 'root' : note.workspace_id || 'root'),
     content: full?.explanation ?? '',
     createdAt: note.created_at ? Date.parse(note.created_at) : undefined,
     updatedAt: note.updated_at ? Date.parse(note.updated_at) : undefined,
@@ -160,6 +175,11 @@ const handleGlobalShortcuts = async (e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && key === 'p') {
       e.preventDefault();
       isCommandPaletteOpen.value = !isCommandPaletteOpen.value;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && key === 'k' && !e.defaultPrevented) {
+      e.preventDefault();
+      isHybridSearchModalOpen.value = !isHybridSearchModalOpen.value;
     }
 
     if ((e.ctrlKey || e.metaKey) && (key === 's' || e.code === 'KeyS')) {
@@ -209,6 +229,7 @@ const handleSelectFile = async (fileId: string) => {
   if (request !== openRequest) return;
 
   activeFileId.value = fileId;
+  void epistemicStore.fetchConceptGraph(fileId);
   if (window.matchMedia('(max-width: 767px)').matches) showSidebar.value = false;
 
   const existingTab = tabs.value.find((t) => t.fileId === fileId);
@@ -261,8 +282,8 @@ const {
     if (!concept) return;
     if (!concept.title.trim()) throw new Error('Escribe un título antes de guardar');
     await conceptStore.updateConcept(fileId, {
-      title: concept.title, explanation: concept.explanation, domain: concept.domain,
-      topic_id: concept.topic_id, temporal_facet: concept.temporal_facet, facet_subtype: concept.facet_subtype
+      title: concept.title, explanation: concept.explanation, workspace_id: concept.workspace_id,
+      folder_id: concept.folder_id, temporal_facet: concept.temporal_facet, facet_subtype: concept.facet_subtype
     });
   },
   onSaveSuccess: () => triggerToast('Nota guardada correctamente', 'success'),
@@ -330,7 +351,7 @@ const noteDestinationOpen = ref(false);
 const noteDestination = ref('');
 const pendingNoteName = ref<string>();
 const pendingNoteContent = ref('');
-const noteDestinations = computed(() => folders.value.filter(f => f.kind === 'domain' || f.kind === 'topic').map(f => {
+const noteDestinations = computed(() => folders.value.map(f => {
   const names = [f.name];
   let parent = folders.value.find(p => p.id === f.parentId);
   while (parent) { names.unshift(parent.name); parent = folders.value.find(p => p.id === parent!.parentId); }
@@ -342,7 +363,7 @@ const confirmNoteDestination = async () => {
 };
 const handleCreateFile = async (folderId = 'root', defaultName?: string, initialContent = '') => {
   if (creatingNote.value) return;
-  if (folderId === 'root') {
+  if (folderId === 'root' && !cerebroStore.activeCerebro) {
     pendingNoteName.value = defaultName;
     pendingNoteContent.value = initialContent;
     noteDestination.value = '';
@@ -358,21 +379,12 @@ const handleCreateFile = async (folderId = 'root', defaultName?: string, initial
     };
 
     if (noteFacets.some(facet => facet.id === cerebroStore.activeFacet)) conceptData.temporal_facet = cerebroStore.activeFacet;
-    const isTopic = topicStore.topics.find((t: any) => t.id === folderId);
-    const isDomain = domainStore.domains.find((d: any) => d.id === folderId);
-
-    if (isTopic) {
-      conceptData.topic_id = folderId;
-      conceptData.domain = isTopic.domain_id;
-    } else if (isDomain) {
-      conceptData.domain = folderId;
-      conceptData.topic_id = null;
-    } else {
-      conceptData.domain = '';
-    }
-
+    const target = folderStore.folders.find(f=>f.id===folderId);
+    const workspace = cerebroStore.cerebros.find(c=>c.id===folderId);
+    conceptData.workspace_id = target?.workspace_id || workspace?.id || cerebroStore.activeCerebro?.id;
+    conceptData.folder_id = target?.id || null;
+    if (!conceptData.workspace_id) throw new Error('Selecciona un espacio para la nota');
     const newConcept = await conceptStore.createConcept(conceptData);
-    await domainStore.fetchDomains();
     await handleSelectFile(newConcept.id);
     return newConcept.id;
   } catch (e) {
@@ -402,45 +414,12 @@ const handleCreateDailyNote = async () => {
 
 const handleCreateFolder = async (parentId = 'root', defaultName?: string) => {
   try {
-    const placeholderName = defaultName || `Nueva Carpeta ${folders.value.length + 1}`;
-
-    const isArea = areaStore.areas.find((a: any) => a.id === parentId);
-    const isDomain = domainStore.domains.find((d: any) => d.id === parentId);
-
-    const workspace = cerebroStore.cerebros.find(c => c.id === parentId);
-    if (parentId === 'root' || workspace) {
-      const newArea = await areaStore.createArea({
-        name: placeholderName,
-        cerebro_id: workspace?.id || cerebroStore.activeCerebro?.id || null,
-        description: 'Área',
-        color: '#3b82f6'
-      });
-      return newArea.id;
-    } else if (isArea) {
-      const newDomain = await domainStore.createDomain({
-        name: placeholderName,
-        description: 'Dominio',
-        color: '#10b981',
-        area_id: parentId
-      });
-      return newDomain.id;
-    } else if (isDomain) {
-      const newTopic = await topicStore.createTopic({
-        name: placeholderName,
-        description: 'Tema',
-        color: '#8b5cf6',
-        domain_id: parentId
-      });
-      return newTopic.id;
-    } else {
-      triggerToast('Los temas no admiten subcarpetas', 'error');
-    }
-  } catch (e: any) {
-    console.error(e);
-    triggerToast(e?.response?.data?.error?.message || 'No se pudo crear la carpeta', 'error');
-  }
+    const parent=folderStore.folders.find(f=>f.id===parentId);
+    const ws=parent?.workspace_id || cerebroStore.cerebros.find(c=>c.id===parentId)?.id || cerebroStore.activeCerebro?.id;
+    if(!ws) throw new Error('Selecciona un espacio en el explorador');
+    return (await folderStore.createFolder(ws,defaultName || 'Nueva carpeta',parent?.id || null)).id;
+  } catch(e) { triggerToast(e instanceof Error?e.message:'No se pudo crear la carpeta','error'); }
 };
-
 const handleRenameFile = async (fileId: string, newName: string) => {
   try {
     const cached = conceptStore.concepts.find((c: Concept) => c.id === fileId);
@@ -452,22 +431,10 @@ const handleRenameFile = async (fileId: string, newName: string) => {
   } catch (e) { console.error(e) }
 };
 
-const handleRenameFolder = async (folderId: string, newName: string) => {
-  try {
-    const isArea = areaStore.areas.find((a: any) => a.id === folderId);
-    const isDomain = domainStore.domains.find((d: any) => d.id === folderId);
-    const isTopic = topicStore.topics.find((t: any) => t.id === folderId);
-
-    if (isArea) {
-      await areaStore.updateArea(folderId, { name: newName });
-    } else if (isDomain) {
-      await domainStore.updateDomain(folderId, { name: newName });
-    } else if (isTopic) {
-      await topicStore.updateTopic(folderId, { name: newName });
-    }
-  } catch (e) { console.error(e) }
+const handleRenameFolder = async (id:string,name:string) => {
+  const folder=folderStore.folders.find(f=>f.id===id);if(!folder)return;
+  try {await folderStore.renameFolder(folder.workspace_id,id,name);}catch(e){triggerToast(String(e),'error');}
 };
-
 const handleDeleteFile = async (fileId: string) => {
   try {
     await conceptStore.deleteConcept(fileId);
@@ -478,67 +445,21 @@ const handleDeleteFile = async (fileId: string) => {
   } catch (e) { console.error(e) }
 };
 
-const handleDeleteFolder = async (folderId: string) => {
-  try {
-    const isArea = areaStore.areas.find((a: any) => a.id === folderId);
-    const isDomain = domainStore.domains.find((d: any) => d.id === folderId);
-    const isTopic = topicStore.topics.find((t: any) => t.id === folderId);
-
-    if (isArea) {
-      await areaStore.deleteArea(folderId);
-    } else if (isDomain) {
-      await domainStore.deleteDomain(folderId);
-    } else if (isTopic) {
-      await topicStore.deleteTopic(folderId);
-    }
-  } catch (e) { console.error(e) }
+const handleDeleteFolder = async (id:string) => {
+  const folder=folderStore.folders.find(f=>f.id===id);if(!folder)return;
+  if(!await flushUnsaved())return;
+  try {await folderStore.trashBatch(folder.workspace_id,[id]);await conceptStore.fetchConceptSummaries();}catch(e){triggerToast(String(e),'error');}
 };
-
-const handleMoveFile = async (fileId: string, targetFolderId: string) => {
-  try {
-    const isTopic = topicStore.topics.find((t: any) => t.id === targetFolderId);
-    const isDomain = domainStore.domains.find((d: any) => d.id === targetFolderId);
-
-    if (isTopic) {
-      await conceptStore.updateConcept(fileId, {
-        topic_id: targetFolderId,
-        domain: isTopic.domain_id
-      });
-    } else if (isDomain) {
-      await conceptStore.updateConcept(fileId, {
-        topic_id: null,
-        domain: targetFolderId
-      });
-    } else {
-      await conceptStore.updateConcept(fileId, {
-        topic_id: null,
-        domain: ''
-      });
-    }
-  } catch (e) { console.error(e) }
+const handleMoveFile = async (id:string,targetId:string) => {
+  const folder=folderStore.folders.find(f=>f.id===targetId);
+  const ws=folder?.workspace_id || cerebroStore.cerebros.find(c=>c.id===targetId)?.id || cerebroStore.activeCerebro?.id;
+  if(!ws)return;
+  try {await conceptStore.updateConcept(id,{workspace_id:ws,folder_id:folder?.id || null});}catch(e){triggerToast(String(e),'error');}
 };
-
-// La jerarquía es Área > Dominio > Tema: solo son válidos los movimientos
-// dominio→área y tema→dominio.
-const handleMoveFolder = async (folderId: string, targetId: string) => {
-  try {
-    const isDomain = domainStore.domains.find((d: any) => d.id === folderId);
-    const isTopic = topicStore.topics.find((t: any) => t.id === folderId);
-    const targetIsArea = areaStore.areas.find((a: any) => a.id === targetId);
-    const targetIsDomain = domainStore.domains.find((d: any) => d.id === targetId);
-
-    if (isDomain && targetIsArea) {
-      await domainStore.updateDomain(folderId, { area_id: targetId });
-      triggerToast('Dominio movido', 'success');
-    } else if (isTopic && targetIsDomain) {
-      await topicStore.updateTopic(folderId, { domain_id: targetId });
-      triggerToast('Tema movido', 'success');
-    } else {
-      triggerToast('Movimiento no válido: los dominios van dentro de áreas y los temas dentro de dominios', 'error');
-    }
-  } catch (e) { console.error(e) }
+const handleMoveFolder = async (id:string,targetId:string) => {
+  const folder=folderStore.folders.find(f=>f.id===id);if(!folder)return;
+  try {await folderStore.moveFolder(folder.workspace_id,id,targetId==='root'?null:targetId,folder.version);}catch(e){triggerToast(String(e),'error');}
 };
-
 const sidebarRef = ref<InstanceType<typeof Sidebar> | null>(null);
 
 const handleTagClick = (tag: string) => {
@@ -570,12 +491,9 @@ const handleWikiLinkClick = async (noteName: string) => {
 
 // Import masivo: uno o varios .md sueltos, todos al mismo tema (título = frontmatter.title o nombre de archivo)
 const handleImportMarkdownFiles = async (folderId: string, fileList: File[]) => {
-  const topic = topicStore.topics.find((t: any) => t.id === folderId);
-  if (!topic) {
-    triggerToast('Solo se puede importar dentro de un tema', 'error');
-    return;
-  }
-
+  const folder = folderStore.folders.find(f=>f.id===folderId);
+  const ws=folder?.workspace_id || cerebroStore.activeCerebro?.id;
+  if(!ws) {triggerToast('Selecciona un espacio de destino','error');return;}
   let ok = 0, failed = 0;
   for (const file of fileList) {
     try {
@@ -585,8 +503,8 @@ const handleImportMarkdownFiles = async (folderId: string, fileList: File[]) => 
       await conceptStore.createConcept({
         title,
         explanation: body.trim() || title,
-        domain: topic.domain_id,
-        topic_id: topic.id
+        workspace_id: ws,
+        folder_id: folder?.id || null
       });
       ok++;
     } catch (e) {
@@ -596,7 +514,7 @@ const handleImportMarkdownFiles = async (folderId: string, fileList: File[]) => 
   }
 
   triggerToast(
-    failed ? `${ok} nota(s) importada(s), ${failed} fallaron` : `${ok} nota(s) importada(s) en "${topic.name}"`,
+    failed ? `${ok} nota(s) importada(s), ${failed} fallaron` : `${ok} nota(s) importada(s) en "${folder?.name || 'Raíz'}"`,
     failed ? 'error' : 'success'
   );
 };
@@ -624,7 +542,6 @@ const handleExportVault = () => {
 
 const isBackupModalOpen = ref(false);
 const isExportingAll = ref(false);
-const exportingAreaId = ref<string | null>(null);
 
 const handleDownloadVaultZip = async () => {
   isExportingAll.value = true;
@@ -636,22 +553,6 @@ const handleDownloadVaultZip = async () => {
     triggerToast('Error al generar el archivo .zip de la bóveda', 'error');
   } finally {
     isExportingAll.value = false;
-  }
-};
-
-const handleDownloadAreaZip = async (areaId: string, areaName?: string) => {
-  if (!areaId) return;
-  exportingAreaId.value = areaId;
-  try {
-    const targetArea = areaStore.areas.find((a: any) => a.id === areaId);
-    const name = areaName || targetArea?.name || 'area';
-    const filename = await ExportService.triggerNotesZipDownload(areaId, name);
-    triggerToast(`Área "${name}" descargada: ${filename}`, 'success');
-  } catch (e: any) {
-    console.error('Error al exportar area ZIP:', e);
-    triggerToast('Error al generar el archivo .zip del área', 'error');
-  } finally {
-    exportingAreaId.value = null;
   }
 };
 
@@ -756,6 +657,25 @@ const handleTriggerAction = (action: string) => {
           <span>Paleta</span>
         </button>
 
+        <button
+          @click="isHybridSearchModalOpen = true"
+          class="palette-btn"
+          title="Búsqueda Híbrida FTS5 + sqlite-vec (Ctrl+K)"
+        >
+          <Sparkles :size="13" class="text-indigo-400" />
+          <span>Búsqueda Híbrida</span>
+        </button>
+
+        <button
+          @click="showEpistemicInspector = !showEpistemicInspector"
+          class="palette-btn"
+          :class="{ 'bg-emerald-600/30 text-emerald-300 border-emerald-500/40': showEpistemicInspector }"
+          title="Inspector Epistémico (Afirmaciones y Evidencias)"
+        >
+          <ShieldCheck :size="13" class="text-emerald-400" />
+          <span>Epistémico</span>
+        </button>
+
         <button @click="showCopilot = !showCopilot" class="copilot-btn"
           :class="showCopilot ? 'copilot-active' : 'copilot-inactive'" title="Mostrar / Ocultar Chat Copiloto">
           <BrainCircuit :size="14" />
@@ -771,12 +691,12 @@ const handleTriggerAction = (action: string) => {
 
     <div class="notes-main">
       <Sidebar ref="sidebarRef" v-show="showSidebar" :files="loadingNotes || loadError ? [] : files" :loading="loadingNotes" :error="loadError" :creating="creatingNote" :folders="folders" :activeFileId="activeFileId"
+        :workspaceId="cerebroStore.activeCerebro?.id"
         :activeFacet="cerebroStore.activeFacet" @selectFile="handleSelectFile" @createFile="handleCreateFile"
         @createFolder="handleCreateFolder" @renameFile="handleRenameFile" @renameFolder="handleRenameFolder"
         @deleteFile="handleDeleteFile" @deleteFolder="handleDeleteFolder" @moveFile="handleMoveFile"
         @moveFolder="handleMoveFolder" @exportVault="handleExportVault" @exportVaultZip="handleDownloadVaultZip"
-        @exportArea="(areaId: string, areaName?: string) => handleDownloadAreaZip(areaId, areaName)"
-        @exportAreaZip="(areaId: string) => handleDownloadAreaZip(areaId)" @createDailyNote="handleCreateDailyNote"
+        @createDailyNote="handleCreateDailyNote"
         @importMarkdownFiles="handleImportMarkdownFiles" />
 
       <div class="inner-content">
@@ -786,6 +706,13 @@ const handleTriggerAction = (action: string) => {
           @tagClick="handleTagClick" @fileRestored="handleFileRestored" @updateMetadata="handleUpdateMetadata" />
       </div>
 
+      <EpistemicInspector
+        v-if="showEpistemicInspector"
+        :workspace-id="cerebroStore.activeCerebro?.id || 'default'"
+        :active-concept-id="activeFileId"
+        @close="showEpistemicInspector = false"
+      />
+
       <Copilot v-if="showCopilot" :files="files" :activeFileId="activeFileId"
         @updateFileContent="handleUpdateFileContent" @openNote="handleSelectFile" @close="showCopilot = false" />
     </div>
@@ -794,17 +721,25 @@ const handleTriggerAction = (action: string) => {
       @selectFile="handleSelectFile" @createFile="(name?: string) => handleCreateFile('root', name)"
       @triggerAction="handleTriggerAction" />
 
-    <BackupModal :isOpen="isBackupModalOpen" :areas="areaStore.areas" :domains="domainStore.domains"
-      :topics="topicStore.topics" :files="files" :isExportingAll="isExportingAll" :exportingAreaId="exportingAreaId"
-      @close="isBackupModalOpen = false" @exportVault="handleDownloadVaultZip"
-      @exportArea="({ areaId, areaName }) => handleDownloadAreaZip(areaId, areaName)" />
+    <HybridSearchModal
+      :is-open="isHybridSearchModalOpen"
+      :workspace-id="cerebroStore.activeCerebro?.id || 'default'"
+      @close="isHybridSearchModalOpen = false"
+      @select-concept="handleSelectFile"
+    />
+
+    <div v-if="isBackupModalOpen" class="cerebro-modal-backdrop" @click.self="isBackupModalOpen = false">
+      <section class="cerebro-modal-card"><div class="cerebro-modal-header"><h3>Respaldo de notas</h3></div>
+      <div class="cerebro-modal-body"><p>Descarga tus notas como archivos Markdown en un ZIP.</p></div>
+      <div class="cerebro-modal-footer"><button @click="isBackupModalOpen = false">Cerrar</button><button class="cerebro-btn-submit" :disabled="isExportingAll" @click="handleDownloadVaultZip">{{ isExportingAll ? 'Exportando…' : 'Descargar respaldo' }}</button></div></section>
+    </div>
 
     <div v-if="noteDestinationOpen" class="cerebro-modal-backdrop" @click.self="noteDestinationOpen = false">
       <form class="cerebro-modal-card" @submit.prevent="confirmNoteDestination">
         <div class="cerebro-modal-header"><h3>Nueva nota · Elegir carpeta</h3></div>
         <div class="cerebro-modal-body">
-          <p v-if="!noteDestinations.length">Primero crea un área y un dominio desde el explorador de archivos de este espacio.</p>
-          <template v-else><label for="note-destination">Dominio o tema en el workspace actual</label>
+          <p v-if="!noteDestinations.length">Crea un espacio de conocimiento para guardar tus notas.</p>
+          <template v-else><label for="note-destination">Espacio o carpeta de destino</label>
           <select id="note-destination" v-model="noteDestination" class="cerebro-select" required>
             <option disabled value="">Selecciona una carpeta</option>
             <option v-for="folder in noteDestinations" :key="folder.id" :value="folder.id">{{ folder.label }}</option>

@@ -28,3 +28,10 @@ test('raw HTML and unsafe URLs cannot execute; wikilinks retain aliases', () => 
  assert.match(html,/data-note-link="Destino">Etiqueta/);
  assert.doesNotMatch(renderMarkdown('`[[Destino]]`'),/data-note-link/);
 });
+test('indented code stays literal and task lists keep their accessible checkbox', () => {
+ assert.doesNotMatch(renderMarkdown('    $$literal$$'),/class="katex/);
+ assert.match(renderMarkdown('    $$literal$$'),/<pre><code>/);
+ const html=renderMarkdown('- [ ] Pendiente\n  - [x] Completado');
+ assert.equal((html.match(/class="task-list-item"/g)||[]).length,2);
+ assert.equal((html.match(/type="checkbox"/g)||[]).length,2);
+});

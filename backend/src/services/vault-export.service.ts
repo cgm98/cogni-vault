@@ -31,6 +31,14 @@ function sanitizeFolder(name: string): string {
 }
 
 export function buildVaultFiles(userId: string, options?: { areaId?: string }): VaultExport {
+  const spaces = sqlite.prepare('SELECT id,name FROM cerebros WHERE user_id=?').all(userId) as any[];
+  const vfs = sqlite.prepare('SELECT f.* FROM folders f JOIN cerebros w ON w.id=f.workspace_id WHERE w.user_id=?').all(userId) as any[];
+  const vfsPath = (workspace:string,id?:string|null) => {
+    const names:string[]=[];const seen=new Set<string>();
+    while(id && !seen.has(id)){seen.add(id);const folder=vfs.find(f=>f.id===id && f.workspace_id===workspace);if(!folder)break;names.unshift(folder.name);id=folder.parent_id;}
+    names.unshift(spaces.find(w=>w.id===workspace)?.name || 'Espacio');
+    return names.map(sanitizeFolder);
+  };
   const allAreas = sqlite.prepare('SELECT * FROM areas WHERE user_id = ?').all(userId) as any[];
   const allDomains = sqlite.prepare('SELECT * FROM domains WHERE user_id = ?').all(userId) as any[];
   const allTopics = sqlite.prepare('SELECT * FROM topics WHERE user_id = ?').all(userId) as any[];
@@ -103,7 +111,7 @@ export function buildVaultFiles(userId: string, options?: { areaId?: string }): 
 
     const areaName = area?.name || 'Sin Area';
     const domainName = domain?.name || 'Sin Dominio';
-    const folders = [areaName, domainName, ...(topic ? [topic.name] : [])].map(sanitizeFolder);
+    const folders = c.workspace_id ? vfsPath(c.workspace_id,c.folder_id) : [areaName, domainName, ...(topic ? [topic.name] : [])].map(sanitizeFolder);
 
     const pascalName = idToPascal.get(c.id)!;
     const dateStr = c.created_at ? c.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
@@ -118,6 +126,7 @@ export function buildVaultFiles(userId: string, options?: { areaId?: string }): 
       '---',
       `title: "${pascalName}"`,
       `original_title: "${c.title.replace(/"/g, '\\"')}"`,
+      ...(c.workspace_id ? [`workspace_id: ${JSON.stringify(c.workspace_id)}`, `folder_id: ${JSON.stringify(c.folder_id)}`] : []),
       'tags:',
       ...tags,
       `date: ${dateStr}`,
@@ -163,14 +172,16 @@ export function buildVaultFiles(userId: string, options?: { areaId?: string }): 
   // Carpetas sin notas (áreas/dominios/temas vacíos): el zip las conserva igual,
   // como entradas de directorio explícitas — si no, no aparecerían en absoluto.
   const folderPaths = new Set<string>();
-  for (const a of areas) {
+  for (const space of spaces) folderPaths.add(vfsPath(space.id).join('/'));
+  for (const folder of vfs.filter(f=>!f.deleted_at)) folderPaths.add(vfsPath(folder.workspace_id,folder.id).join('/'));
+  for (const a of areas.filter(()=>!allConcepts.some(c=>c.workspace_id))) {
     folderPaths.add(sanitizeFolder(a.name));
   }
-  for (const d of domains) {
+  for (const d of domains.filter(()=>!allConcepts.some(c=>c.workspace_id))) {
     const area = d.area_id ? areaById.get(d.area_id) : undefined;
     folderPaths.add([area?.name || 'Sin Area', d.name].map(sanitizeFolder).join('/'));
   }
-  for (const t of topics) {
+  for (const t of topics.filter(()=>!allConcepts.some(c=>c.workspace_id))) {
     const domain = domainById.get(t.domain_id);
     const area = domain?.area_id ? areaById.get(domain.area_id) : undefined;
     folderPaths.add([area?.name || 'Sin Area', domain?.name || 'Sin Dominio', t.name].map(sanitizeFolder).join('/'));

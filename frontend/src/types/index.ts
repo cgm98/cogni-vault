@@ -14,7 +14,7 @@ export interface FileItem {
 }
 
 export interface FolderItem {
-  kind?: 'workspace' | 'area' | 'domain' | 'topic';
+  kind?: 'workspace' | 'folder' | 'area' | 'domain' | 'topic';
   id: string;
   name: string;
   path?: string;

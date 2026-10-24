@@ -11,6 +11,10 @@ import { AnalyticsController } from './controllers/analytics.controller.js';
 import { ExportController } from './controllers/export.controller.js';
 import { ImportController } from './controllers/import.controller.js';
 import { ImageController } from './controllers/image.controller.js';
+import { FolderController } from './controllers/folder.controller.js';
+import { TaxonomyController } from './controllers/taxonomy.controller.js';
+import { EpistemicController } from './controllers/epistemic.controller.js';
+import { SearchController } from './controllers/search.controller.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +25,61 @@ app.use(express.raw({ type: 'image/*', limit: '10mb' }));
 
 // Auth guard global
 app.use(authMiddleware);
+
+// Rutas Carpetas (Árbol N-Niveles, Mover, Papelera y Restauración)
+app.post('/api/folders/migrate-legacy', FolderController.migrateUser);
+app.get('/api/workspaces/:workspaceId/folders/tree', FolderController.getTree);
+app.get('/api/workspaces/:workspaceId/folders', FolderController.getAll);
+app.post('/api/workspaces/:workspaceId/folders', FolderController.create);
+app.post('/api/workspaces/:workspaceId/migrate-hierarchy', FolderController.migrateWorkspace);
+app.get('/api/folders/:id', FolderController.getById);
+app.put('/api/folders/:id', FolderController.update);
+app.patch('/api/folders/:id/move', FolderController.move);
+app.delete('/api/folders/:id', FolderController.trash);
+app.post('/api/folders/trash-batches/:batchId/restore', FolderController.restoreBatch);
+
+// Rutas Taxonomía y Términos Desacoplados
+app.get('/api/workspaces/:workspaceId/taxonomy/terms/tree', TaxonomyController.getTermTree);
+app.get('/api/workspaces/:workspaceId/taxonomy/terms', TaxonomyController.listTerms);
+app.post('/api/workspaces/:workspaceId/taxonomy/terms', TaxonomyController.createTerm);
+app.delete('/api/taxonomy/terms/:id', TaxonomyController.deleteTerm);
+
+// Rutas Clasificación de Conceptos (Explícita vs Heredada)
+app.get('/api/concepts/:id/taxonomy', TaxonomyController.getConceptClassification);
+app.post('/api/concepts/:id/taxonomy', TaxonomyController.assignTerm);
+app.delete('/api/concepts/:id/taxonomy/:termId', TaxonomyController.removeTerm);
+
+// Rutas Etiquetas (Tags M:N)
+app.get('/api/workspaces/:workspaceId/tags', TaxonomyController.listTags);
+app.post('/api/workspaces/:workspaceId/tags', TaxonomyController.createTag);
+app.delete('/api/tags/:id', TaxonomyController.deleteTag);
+app.get('/api/concepts/:id/tags', TaxonomyController.listTagsForConcept);
+app.post('/api/concepts/:id/tags', TaxonomyController.attachTag);
+app.delete('/api/concepts/:id/tags/:tagId', TaxonomyController.detachTag);
+
+// Rutas Documento Canónico AST
+app.get('/api/concepts/:id/ast', TaxonomyController.getConceptAst);
+app.put('/api/concepts/:id/ast', TaxonomyController.updateConceptAst);
+
+// Rutas Epistémicas y Evidencia (Fase 3: Fuentes, Anclas, Afirmaciones y Relaciones)
+app.get('/api/workspaces/:workspaceId/sources', EpistemicController.listSources);
+app.post('/api/workspaces/:workspaceId/sources', EpistemicController.createSource);
+app.get('/api/sources/:sourceId/anchors', EpistemicController.listAnchors);
+app.post('/api/sources/:sourceId/anchors', EpistemicController.createAnchor);
+app.get('/api/concepts/:id/claims', EpistemicController.listClaims);
+app.post('/api/concepts/:id/claims', EpistemicController.createClaim);
+app.patch('/api/claims/:id/review', EpistemicController.reviewClaim);
+app.get('/api/claims/:id/evidence', EpistemicController.listEvidenceForClaim);
+app.post('/api/claims/:id/evidence', EpistemicController.linkEvidence);
+app.delete('/api/claims/:id/evidence/:anchorId', EpistemicController.unlinkEvidence);
+app.post('/api/claims/relations', EpistemicController.createRelation);
+app.patch('/api/claims/relations/:id/status', EpistemicController.updateRelationStatus);
+app.get('/api/concepts/:id/epistemic-graph', EpistemicController.getConceptGraph);
+
+// Rutas Búsqueda Híbrida e Inteligencia Evaluada (Fase 4: FTS5 + sqlite-vec + Candidatos)
+app.get('/api/workspaces/:workspaceId/search', SearchController.search);
+app.post('/api/workspaces/:workspaceId/claims/candidates', SearchController.findCandidates);
+app.post('/api/workspaces/:workspaceId/index/:entityType/:entityId', SearchController.indexEntity);
 
 // Rutas Cerebros
 app.get('/api/cerebros', CerebroController.getAll);

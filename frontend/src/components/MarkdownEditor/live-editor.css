@@ -1,0 +1,37 @@
+.live-editor { position: relative; min-width: 0; min-height: 40vh; }
+.live-editor .cm-editor { background: transparent; color: var(--fg); font-size: 16px; line-height: 1.8; }
+.live-editor .cm-editor.cm-focused { outline: none; }
+.live-editor .cm-scroller { font-family: inherit; overflow: visible; min-width: 0; }
+.live-editor .cm-content { width: 100%; min-width: 0; padding: 12px 0 140px; caret-color: var(--fg); min-height: 45vh; }
+.live-editor .cm-line { padding: 2px 0; }
+.live-editor .cm-selectionBackground { background: #818cf840 !important; }
+.live-editor .cm-cursor { border-left-color: var(--fg); }
+.live-editor .cm-live-h1 { font-size: 2em; font-weight: 700; line-height: 1.35; padding: 16px 0 10px; }
+.live-editor .cm-live-h2 { font-size: 1.55em; font-weight: 650; line-height: 1.35; padding: 14px 0 8px; }
+.live-editor .cm-live-h3 { font-size: 1.25em; font-weight: 650; line-height: 1.35; padding: 10px 0 6px; }
+.live-editor :is(.cm-live-h4,.cm-live-h5,.cm-live-h6) { font-weight: 650; }
+.live-editor [class*=cm-live-h] span { text-decoration: none !important; color: inherit; }
+.cm-live-strong { font-weight: 700; }
+.cm-live-em { font-style: italic; }
+.cm-live-strike { text-decoration: line-through; }
+.cm-live-code { font-family: var(--font-mono); background: var(--surface); border-radius: 4px; padding: 1px 3px; }
+.live-editor .cm-live-link { color: #a5b4fc; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.live-editor .cm-live-quote { border-left: 3px solid var(--primary); padding-left: 16px; color: var(--muted); }
+.cm-list-bullet { display: inline-block; width: .65em; color: var(--muted); }
+.cm-live-preview { position: relative; padding: 4px 0; margin: 8px 0 18px; min-width: 0; white-space: normal; }
+.cm-live-preview pre { margin-top: 0; }
+.cm-edit-block { display: block; font-size: 11px; color: var(--muted); background: var(--bg); padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; margin: 6px 0 6px auto; cursor: pointer; }
+.cm-edit-block:hover { color: var(--fg); border-color: var(--primary); }
+.cm-live-inline { cursor: text; }
+.cm-live-inline img { display: inline-block; max-width: 100%; height: auto; vertical-align: middle; }
+.live-format-toolbar { position: relative; width: 100%; min-height: 38px; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px; background: var(--bg); border: 0; margin: 0; }
+.live-format-toolbar button { min-width: 30px; padding: 5px 8px; font-size: 12px; border-radius: 4px; color: var(--muted); }
+.live-format-toolbar button:hover { color: var(--fg); background: var(--surface); }
+.live-toolbar-hint { margin-left: auto; padding: 0 8px; color: var(--muted); font-size: 11px; }
+.live-editor .cm-tooltip { background: var(--surface); color: var(--fg); border: 1px solid var(--border); }
+.live-editor .cm-tooltip-autocomplete ul li[aria-selected] { background: var(--primary); color: white; }
+.live-editor input[type=checkbox] { margin: 0 6px 0 0; cursor: pointer; accent-color: var(--primary); }
+.cm-live-code-line { font-family: var(--font-mono); background: var(--surface); font-size: 13px; }
+.live-editor-source .cm-editor { font-size: 14px; }
+.live-editor-source .cm-scroller { font-family: var(--font-mono); }
+@media(max-width:600px) { .live-toolbar-hint { display: none; } }

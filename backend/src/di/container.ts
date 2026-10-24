@@ -14,6 +14,34 @@ import { CaptureService } from '../services/capture.service.js';
 import { LinkerService } from '../services/linker.service.js';
 import { NoteDraftService } from '../services/note-draft.service.js';
 
+import { 
+  folderService, 
+  folderRepository, 
+  outboxService, 
+  outboxRepository, 
+  hierarchyMigrationService 
+} from './containers/folder.container.js';
+
+import {
+  taxonomyService,
+  taxonomyRepository,
+  tagRepository,
+  conceptDocumentService
+} from './containers/taxonomy.container.js';
+
+import {
+  epistemicService,
+  epistemicRepository
+} from './containers/epistemic.container.js';
+
+import {
+  searchRepository,
+  embeddingProvider,
+  searchIndexerService,
+  hybridSearchService,
+  evidenceCandidateService
+} from './containers/search.container.js';
+
 // Cerebro
 export const cerebroRepository = new CerebroRepository();
 export const cerebroService = new CerebroService(cerebroRepository);
@@ -38,5 +66,22 @@ export {
   conceptService,
   conceptRepository,
   relationService,
-  relationRepository
+  relationRepository,
+  folderService,
+  folderRepository,
+  outboxService,
+  outboxRepository,
+  hierarchyMigrationService,
+  taxonomyService,
+  taxonomyRepository,
+  tagRepository,
+  conceptDocumentService,
+  epistemicService,
+  epistemicRepository,
+  searchRepository,
+  embeddingProvider,
+  searchIndexerService,
+  hybridSearchService,
+  evidenceCandidateService
 };
+

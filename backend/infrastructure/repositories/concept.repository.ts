@@ -1,6 +1,7 @@
+import { ValidationError } from '../../domain/errors.js';
 import { CerebroRepository } from './cerebro.repository.js';
 import { eq, and, isNull, desc } from 'drizzle-orm';
-import { db } from '../../src/db.js';
+import { db, sqlite } from '../../src/db.js';
 import { concepts, concept_versions } from '../../src/schemas/concept.schema.js';
 import { IConceptRepository } from '../../domain/interfaces/concept.repository.interface.js';
 import { IConceptVersionRepository } from '../../domain/interfaces/concept-version.repository.interface.js';
@@ -8,6 +9,15 @@ import { Concept, ConceptWithMemory, ConceptSummary, TemporalFacet } from '../..
 import { ConceptVersion, ConceptVersionSummary } from '../../domain/entities/concept-version.entity.js';
 
 export class ConceptRepository implements IConceptRepository {
+  private validateLocation(note: Partial<Concept>) {
+    if (!note.workspace_id && !note.folder_id) return;
+    if (!note.workspace_id || !sqlite.prepare('SELECT id FROM cerebros WHERE id=? AND user_id=?').get(note.workspace_id, note.user_id)) {
+      throw new ValidationError('El espacio no existe o no pertenece al usuario');
+    }
+    if (note.folder_id && !sqlite.prepare('SELECT id FROM folders WHERE id=? AND workspace_id=? AND deleted_at IS NULL').get(note.folder_id, note.workspace_id)) {
+      throw new ValidationError('La carpeta de destino no está disponible en este espacio');
+    }
+  }
   getAll(userId: string, limit = 50, offset = 0): ConceptWithMemory[] {
     return db.select()
       .from(concepts)
@@ -21,6 +31,7 @@ export class ConceptRepository implements IConceptRepository {
     return db.select({
       id: concepts.id,
       title: concepts.title,
+      workspace_id: concepts.workspace_id, folder_id: concepts.folder_id,
       domain: concepts.domain,
       topic_id: concepts.topic_id,
       created_at: concepts.created_at,
@@ -62,10 +73,12 @@ export class ConceptRepository implements IConceptRepository {
   }
 
   create(concept: Concept): void {
+    this.validateLocation(concept);
     const now = new Date().toISOString();
     db.insert(concepts).values({
       id: concept.id,
       user_id: concept.user_id,
+      workspace_id: concept.workspace_id ?? null, folder_id: concept.folder_id ?? null,
       domain: concept.domain || 'sin-clasificar',
       topic_id: concept.topic_id ?? null,
       title: concept.title,
@@ -83,6 +96,10 @@ export class ConceptRepository implements IConceptRepository {
   }
 
   update(data: Partial<Concept> & { id: string }, userId?: string): ConceptWithMemory | void {
+    if (data.workspace_id !== undefined || data.folder_id !== undefined) {
+      const existing = sqlite.prepare('SELECT * FROM concepts WHERE id=?').get(data.id) as Concept | undefined;
+      this.validateLocation({ ...existing, ...data, user_id: userId || data.user_id || existing?.user_id });
+    }
     const now = new Date().toISOString();
     const whereClause = userId
       ? and(eq(concepts.id, data.id), eq(concepts.user_id, userId))

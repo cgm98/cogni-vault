@@ -20,7 +20,7 @@ const router = createRouter({
     {
       path: '/taxonomy',
       name: 'taxonomy',
-      component: () => import('../views/TaxonomyManager/Index.vue')
+      redirect: '/notes'
     },
     {
       path: '/challenge',

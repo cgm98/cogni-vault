@@ -1,40 +1,30 @@
-import MarkdownIt from 'markdown-it';
+import { parseMarkdown } from '../../lib/markdown';
 import { EditorState } from '@codemirror/state';
 
-export interface PreviewBlock { from: number; to: number; source: string; kind: 'mermaid' | 'table' | 'math'; code?: string }
-const parser = new MarkdownIt();
+export interface PreviewBlock { from: number; to: number; source: string; kind: 'mermaid' | 'table' | 'math' | 'code' | 'rule'; code?: string }
 // Positions always refer to the original text, never a reserialized document.
 export function previewBlocks(source: string): PreviewBlock[] {
-  const lines = source.split('\n');
+  // markdown-it normalizes CRLF and lone CR before producing token line maps.
+  const lines = source.split(/\r\n|\r|\n/);
   const offsets = [0];
-  for (const line of lines) offsets.push(offsets[offsets.length - 1] + line.length + 1);
+  for (const match of source.matchAll(/\r\n|\r|\n/g)) offsets.push(match.index! + match[0].length);
   const result: PreviewBlock[] = [];
-  const excluded: Array<[number, number]> = [];
-  for (const token of parser.parse(source, {})) {
-    if (!token.map) continue;
+  for (const token of parseMarkdown(source)) {
+    if (!token.map || token.level !== 0) continue;
     const [start, end] = token.map;
-    if (token.type === 'fence' || token.type === 'code_block') excluded.push([start, end]);
-    const kind = token.type === 'table_open' ? 'table' : token.type === 'fence' && token.info.trim().toLowerCase() === 'mermaid' ? 'mermaid' : null;
-    if (!kind || token.level !== 0) continue;
+    const kind: PreviewBlock['kind'] | null = token.type === 'table_open' ? 'table'
+      : token.type === 'note_math_block' ? 'math'
+      : token.type === 'hr' ? 'rule'
+      : token.type === 'code_block' ? 'code'
+      : token.type === 'fence' ? (token.info.trim().split(/\s+/)[0].toLowerCase() === 'mermaid' ? 'mermaid' : ['math','latex','tex'].includes(token.info.trim().split(/\s+/)[0].toLowerCase()) ? 'math' : 'code') : null;
+    if (!kind) continue;
     // Do not replace an unfinished fence while the user is typing.
-    if (kind === 'mermaid' && !(lines[end - 1] || '').trim().startsWith(token.markup)) continue;
-    const from = offsets[start], to = Math.min(source.length, offsets[end] - 1);
-    result.push({ from, to, source: source.slice(from, to), kind, code: token.content });
-  }
-  for (let i = 0; i < lines.length; i++) {
-    if (excluded.some(([start, end]) => i >= start && i < end)) continue;
-    const line = lines[i].trim();
-    const open = line.startsWith('$$') ? '$$' : line.startsWith('\\[') ? '\\[' : '';
-    if (!open) continue;
-    const close = open === '$$' ? '$$' : '\\]';
-    let end = i;
-    if (!line.slice(open.length).endsWith(close)) {
-      end = lines.findIndex((l, index) => index > i && l.trim().endsWith(close));
-      if (end < 0) continue;
+    if (token.type === 'fence') {
+      const closing = (lines[end - 1] || '').trim();
+      if (end - start < 2 || !new RegExp('^' + token.markup[0] + '{' + token.markup.length + ',}\\s*$').test(closing)) continue;
     }
-    const from = offsets[i], to = offsets[end] + lines[end].length;
-    result.push({ from, to, source: source.slice(from, to), kind: 'math' });
-    i = end;
+    const from = offsets[start], to = Math.min(source.length, offsets[end - 1] + lines[end - 1].length);
+    result.push({ from, to, source: source.slice(from, to), kind, code: token.content });
   }
   return result.sort((a,b) => a.from - b.from);
 }

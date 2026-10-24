@@ -9,6 +9,9 @@ export interface Concept {
   topic_id?: string | null;
   area_id?: string | null;
   cerebro_id?: string | null;
+  workspace_id?: string | null;
+  folder_id?: string | null;
+  version?: number;
   strength?: number;
   difficulty?: number;
   status?: string;
@@ -24,6 +27,8 @@ export interface Concept {
 }
 
 export interface ConceptSummary {
+  workspace_id?: string | null;
+  folder_id?: string | null;
   id: string;
   title: string;
   domain: string | null;

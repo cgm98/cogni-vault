@@ -4,13 +4,11 @@ import MarkdownPreview from './MarkdownPreview.vue';
 import LiveEditor from './LiveEditor.vue';
 import { printNote } from './printNote';
 import { useConceptStore } from '../../stores/concept.store';
-import { useDomainStore } from '../../stores/domain.store';
-import { useAreaStore } from '../../stores/area.store';
-import { useTopicStore } from '../../stores/topic.store';
+import { useFolderStore } from '../../stores/folder.store';
 import { useCerebroStore } from '../../stores/cerebro.store';
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, shallowRef, computed, watch, onMounted, onUnmounted } from 'vue';
 import {
-  X, BookOpen, Clock, FileEdit, Tv, Download, History, Save
+  X, BookOpen, Clock, FileEdit, Tv, Download, History, Save, Code2, Maximize2, Minimize2, SlidersHorizontal
 } from 'lucide-vue-next';
 import type { Concept } from '../../types/concept.types';
 import type { FileItem, TabItem, SaveStatus } from '../../types';
@@ -33,10 +31,8 @@ const props = defineProps<{
 }>();
 
 const conceptStore = useConceptStore();
-const domainStore = useDomainStore();
-const areaStore = useAreaStore();
-const topicStore = useTopicStore();
 const cerebroStore = useCerebroStore();
+const folderStore = useFolderStore();
 
 const emit = defineEmits<{
   (e: 'selectTab', tabId: string): void;
@@ -56,21 +52,26 @@ const activeFileConcept = computed(() => {
   return conceptStore.concepts.find((c: any) => c.id === activeFile.value?.id) || null;
 });
 
-const currentDomainObj = computed(() => domainStore.domains.find(d => d.id === activeFileConcept.value?.domain || d.name === activeFileConcept.value?.domain));
-const currentAreaObj = computed(() => areaStore.areas.find(a => a.id === currentDomainObj.value?.area_id));
-const currentCerebroObj = computed(() => cerebroStore.cerebros.find(c => c.id === currentAreaObj.value?.cerebro_id));
-const currentTopic = computed(() => topicStore.topics.find(t => t.id === activeFileConcept.value?.topic_id));
-const availableTopics = computed(() => topicStore.topics.filter(t => t.domain_id === currentDomainObj.value?.id));
-const breadcrumbs = computed(() => [currentCerebroObj.value?.name, currentAreaObj.value?.name, currentDomainObj.value?.name, currentTopic.value?.name].filter(Boolean));
+const currentCerebroObj = computed(() => cerebroStore.cerebros.find(c=>c.id===activeFileConcept.value?.workspace_id));
+const folderPath = (id?:string|null) => {
+  const names:string[]=[]; const seen=new Set<string>();
+  while(id && !seen.has(id)){seen.add(id);const f=folderStore.folders.find(f=>f.id===id);if(!f)break;names.unshift(f.name);id=f.parent_id;}
+  return names;
+};
+const availableFolders=computed(()=>folderStore.folders.filter(f=>f.workspace_id===activeFileConcept.value?.workspace_id).map(f=>({id:f.id,label:folderPath(f.id).join(' / ')})).sort((a,b)=>a.label.localeCompare(b.label)));
+const breadcrumbs=computed(()=>[currentCerebroObj.value?.name,...folderPath(activeFileConcept.value?.folder_id)].filter(Boolean));
 const editorMode = ref<'read' | 'source' | 'live'>('live');
+const widePage = ref(false);
+const showProperties = ref(false);
+const liveEditor = ref<InstanceType<typeof LiveEditor>>();
+const toolbarTarget = shallowRef<HTMLElement | null>(null);
+const modeHint = computed(() => editorMode.value === 'read' ? 'Lectura · Ctrl+E para editar'
+  : editorMode.value === 'source' ? 'Markdown original · Ctrl+E para leer'
+  : 'Escribe / para insertar · Ctrl+E para leer');
 const exportError = ref('');
 const exporting = ref(false);
 const updateMetadata = (patch: Partial<Concept>) => {
   if (activeFile.value) emit('updateMetadata', activeFile.value.id, patch);
-};
-const changeDomain = (domain: string) => {
-  const topic = topicStore.topics.find(t => t.id === activeFileConcept.value?.topic_id);
-  updateMetadata({ domain, topic_id: topic?.domain_id === domain ? topic.id : null });
 };
 const saveNow = () => {
   if (activeFile.value) emit('updateFileContent', activeFile.value.id, activeFile.value.content || '', true);
@@ -93,6 +94,11 @@ const onVersionRestored = (updated: any) => {
 // Listener propio (como CommandPalette): el estado del overlay vive aquí.
 // Solo se monta una instancia de MarkdownEditor, no compite con nadie.
 const onHistoryShortcut = (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e' && activeFile.value) {
+    e.preventDefault();
+    editorMode.value = editorMode.value === 'read' ? 'live' : 'read';
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
     e.preventDefault();
     if (activeFile.value) { if (isHistoryOpen.value) isHistoryOpen.value = false; else void openHistory(); }
@@ -195,7 +201,7 @@ const activeSaveStatus = computed(() => {
     <p class="mde-empty-hint"><kbd>Ctrl</kbd> + <kbd>P</kbd> abre la paleta de comandos</p>
   </div>
 
-  <div v-else class="editor-container">
+  <div v-else class="editor-container" :class="{ 'editor-wide': widePage, 'editor-reading-mode': editorMode === 'read' }">
     <div class="tab-bar">
       <div class="tab-list">
         <div
@@ -206,6 +212,9 @@ const activeSaveStatus = computed(() => {
           @contextmenu.prevent="openTabContextMenu($event, tab.id)"
           class="tab-item"
           :class="{ 'tab-active': props.activeTabId === tab.id }"
+          role="tab" :aria-selected="props.activeTabId === tab.id" tabindex="0"
+          @keydown.enter.prevent="emit('selectTab', tab.id)"
+          @keydown.space.prevent="emit('selectTab', tab.id)"
         >
           <FileEdit :size="12" class="tab-icon" :class="{ 'icon-active': props.activeTabId === tab.id }" />
           <span class="tab-name">{{ props.files.find(f => f.id === tab.fileId)?.name || 'Archivo Eliminado' }}</span>
@@ -218,13 +227,15 @@ const activeSaveStatus = computed(() => {
           </button>
         </div>
       </div>
-
-      <div v-if="activeTab" class="tab-actions">
+    </div>
+      <div v-if="activeTab" class="note-toolbar">
         <div class="editor-mode-switch" aria-label="Modo de la nota">
-          <button @click="editorMode = 'live'" :aria-pressed="editorMode === 'live'" title="Editar Markdown con formato en vivo">En vivo</button>
-          <button @click="editorMode = 'source'" :aria-pressed="editorMode === 'source'" title="Mostrar todos los símbolos Markdown">Markdown</button>
-          <button @click="editorMode = 'read'" :aria-pressed="editorMode === 'read'" title="Solo lectura">Leer</button>
+          <button @click="editorMode = 'live'" :aria-pressed="editorMode === 'live'" title="Editar Markdown con formato en vivo"><FileEdit :size="14" />Editar</button>
+          <button @click="editorMode = 'read'" :aria-pressed="editorMode === 'read'" title="Solo lectura"><BookOpen :size="14" />Leer</button>
+          <button @click="editorMode = 'source'" :aria-pressed="editorMode === 'source'" title="Mostrar todos los símbolos Markdown"><Code2 :size="14" />Markdown</button>
         </div>
+        <div class="tab-actions">
+        <button @click="widePage = !widePage" :aria-pressed="widePage" title="Alternar ancho de página" class="action-btn"><Minimize2 v-if="widePage" :size="15" /><Maximize2 v-else :size="15" /></button>
         <button @click="saveNow" title="Guardar nota (Ctrl+S)" class="action-btn" :disabled="!activeFile"><Save :size="14" /></button>
         <button @click="startPresentation" title="Modo Presentación (Diapositivas)" class="action-btn" :disabled="!activeFile?.content?.trim()">
           <Tv :size="13" />
@@ -237,9 +248,10 @@ const activeSaveStatus = computed(() => {
         <button @click="openHistory" title="Historial de versiones (Ctrl+H)" class="action-btn" :disabled="!activeFile">
           <History :size="13" />
         </button>
+        </div>
       </div>
-    </div>
 
+    <div ref="toolbarTarget" v-show="activeFile && editorMode !== 'read'" class="note-format-slot"></div>
     <div v-if="activeFile" class="editor-content-wrapper">
       <div class="main-canvas">
         <div class="textarea-wrapper">
@@ -248,26 +260,24 @@ const activeSaveStatus = computed(() => {
               <span v-for="(name, index) in breadcrumbs" :key="index"><span v-if="index"> / </span>{{ name }}</span>
             </div>
             <label class="sr-only" for="note-title">Título de la nota</label>
-            <input id="note-title" :value="activeFileConcept.title"
-              @input="updateMetadata({ title: ($event.target as HTMLInputElement).value })"
-              @keydown.enter.prevent="saveNow" placeholder="Título de la nota" class="metadata-title-input" />
-            <div class="metadata-selectors">
+            <h1 v-if="editorMode === 'read'" class="note-page-title">{{ activeFileConcept.title }}</h1>
+            <textarea v-else id="note-title" rows="1" :value="activeFileConcept.title"
+              @input="updateMetadata({ title: ($event.target as HTMLTextAreaElement).value })"
+              @keydown.enter.prevent="liveEditor?.focus()" placeholder="Sin título" class="metadata-title-input"></textarea>
+            <button class="note-properties-toggle" :aria-expanded="showProperties" aria-controls="note-properties" @click="showProperties = !showProperties">
+              <SlidersHorizontal :size="13" /> Propiedades <span>{{ showProperties ? 'Ocultar' : breadcrumbs.at(-1) || 'Ver detalles' }}</span>
+            </button>
+            <div v-if="showProperties" id="note-properties" class="metadata-selectors">
               <label>Faceta
-                <select :value="activeFileConcept.temporal_facet || ''" @change="updateMetadata({ temporal_facet: ($event.target as HTMLSelectElement).value as Concept['temporal_facet'] })" class="metadata-select">
+                <select :disabled="editorMode === 'read'" :value="activeFileConcept.temporal_facet || ''" @change="updateMetadata({ temporal_facet: ($event.target as HTMLSelectElement).value as Concept['temporal_facet'] })" class="metadata-select">
                   <option value="" disabled>Sin faceta asignada</option>
                   <option v-for="facet in noteFacets" :key="facet.id" :value="facet.id">{{ facet.label }}</option>
                 </select>
               </label>
-              <label>Dominio
-                <select :value="currentDomainObj?.id || ''" @change="changeDomain(($event.target as HTMLSelectElement).value)" class="metadata-select">
-                  <option value="" disabled>Sin dominio asignado</option>
-                  <option v-for="domain in domainStore.domains" :key="domain.id" :value="domain.id">{{ domain.name }}</option>
-                </select>
-              </label>
-              <label>Tema
-                <select :value="activeFileConcept.topic_id || ''" @change="updateMetadata({ topic_id: ($event.target as HTMLSelectElement).value || null })" class="metadata-select">
-                  <option value="">Sin tema asignado</option>
-                  <option v-for="topic in availableTopics" :key="topic.id" :value="topic.id">{{ topic.name }}</option>
+              <label>Carpeta
+                <select :disabled="editorMode === 'read'" :value="activeFileConcept.folder_id || ''" @change="updateMetadata({folder_id: ($event.target as HTMLSelectElement).value || null})" class="metadata-select">
+                  <option value="">Raíz · {{ currentCerebroObj?.name || 'Espacio' }}</option>
+                  <option v-for="folder in availableFolders" :key="folder.id" :value="folder.id">{{ folder.label }}</option>
                 </select>
               </label>
             </div>
@@ -278,7 +288,7 @@ const activeSaveStatus = computed(() => {
           </div>
           <p v-if="exportError" class="note-save-error" role="alert">{{ exportError }}</p>
           <div class="note-panes">
-            <LiveEditor v-show="editorMode !== 'read'" :file-id="activeFile.id" :content="activeFile.content || ''"
+            <LiveEditor ref="liveEditor" :toolbar-target="toolbarTarget" v-show="editorMode !== 'read'" :active="editorMode !== 'read'" :file-id="activeFile.id" :content="activeFile.content || ''"
               :source-mode="editorMode === 'source'" :files="files" :open-file-ids="tabs.map(tab => tab.fileId!).filter(Boolean)"
               @change="(id, content) => emit('updateFileContent', id, content)" @wikiLinkClick="target => emit('wikiLinkClick', target)" />
             <MarkdownPreview v-if="editorMode === 'read'" :key="activeFile.id" :content="activeFile.content || ''" @wikiLinkClick="target => emit('wikiLinkClick', target)" />
@@ -296,7 +306,7 @@ const activeSaveStatus = computed(() => {
           <span v-if="activeSaveStatus" class="status-save" :class="activeSaveStatus.cls">
             {{ activeSaveStatus.text }}
           </span>
-          <span class="status-hint">Ctrl+Click abre [[enlaces]]</span>
+          <span class="status-hint">{{ modeHint }}</span>
           <Clock :size="11" class="clock-icon" />
           <span v-if="activeFile.updatedAt">Última mod: {{ new Date(activeFile.updatedAt).toLocaleTimeString("es-ES", { hour: "numeric", minute: "2-digit" }) }}</span>
         </div>
